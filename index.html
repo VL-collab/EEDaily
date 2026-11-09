@@ -69,6 +69,17 @@
   </header>
 
   <main id="dailyWorkspace" class="max-w-4xl mx-auto px-4 py-6">
+    <details open class="no-print mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-4 md:p-5">
+      <summary class="cursor-pointer text-sm md:text-base font-black text-slate-900">日報使用守則</summary>
+      <ol class="mt-3 space-y-2 text-sm text-slate-700 leading-relaxed list-decimal pl-5">
+        <li>同一日的正常工作與超時工作，盡量寫在同一份日報。勾選「超時工作 (OT)」後，只在真正超時的地點勾 (OT)。總開關會把各地點一併勾上，日間地點請取消勾選。</li>
+        <li>總開工人數是全部地點相加。超時人數只計已勾 (OT) 的地點。各超時時段的人數加總，必須等於超時人數，才可以匯出。</li>
+        <li>一天不建議另外再開超過一份 OT 日報。同一段超時只留一份。只有另一段、時間不同的超時，才另存一份只記該段的 OT 日報。</li>
+        <li>要更正當日資料，請改同一份再匯出，不要同一日存多份內容相近的日報。</li>
+        <li>天氣警告、停工、物料、檢查、工傷、阻礙和辦公室人員，都寫在這份日報。未簽名不能產生日報。</li>
+        <li>請匯出 Word、Excel 或專檔給管理者。不要把已經彙整的週報、雙週報或月報當作每日檔。</li>
+      </ol>
+    </details>
     <form id="dailyLogForm" class="space-y-6" onsubmit="event.preventDefault(); handleFormSubmit();">
 
       <!-- 區塊 1: 基本資料 (天氣狀況支援多選警告信號) -->
@@ -522,11 +533,22 @@
   </main>
 
   <section id="adminWorkspace" class="hidden max-w-6xl mx-auto px-4 py-6 space-y-5">
+    <details open class="bg-amber-50 border border-amber-200 rounded-2xl p-4 md:p-5">
+      <summary class="cursor-pointer text-sm md:text-base font-black text-slate-900">管理者使用守則</summary>
+      <ol class="mt-3 space-y-2 text-sm text-slate-700 leading-relaxed list-decimal pl-5">
+        <li>只匯入每日 Word、Excel 或專檔。不要匯入已經彙整的週報、雙週報或月報。</li>
+        <li>同一項目、同一日最好只有一份「日間＋OT」日報。若同日還有另一份純日間日報，系統會略過日間檔，避免人數計兩次。</li>
+        <li>一天不建議多於一份額外的 OT 日報。不同時段的 OT 日報會當成多段超時，人數和人時相加。完全相同的 OT 時段只保留較新的一份。</li>
+        <li>在月曆點選日子。週報取該週星期一至日；雙週報取上一週星期一至本週星期日；月報取該月。中文和英文報告使用同一套數字。</li>
+        <li>日間人數只計沒有勾 OT 的地點。OT 人數只計已勾 OT 的地點。OT 人時是各時段時數乘該時段人數。工種人數不可相加當作當日總人數。</li>
+        <li>匯出前先看檔案清單。「日間＋OT」代表該份同時有日間和超時。出現略過提示時，表示重複檔沒有計入。</li>
+      </ol>
+    </details>
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 md:p-6">
       <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div>
           <h2 class="text-xl font-black text-slate-900">管理者模式</h2>
-          <p class="text-sm text-slate-500 mt-1">先選擇 Word 或 Excel，再匯入多份每日報告。檢視日期與 OT 後，可輸出週報、雙週報或月報。</p>
+          <p class="text-sm text-slate-500 mt-1">先選擇 Word、Excel 或專檔，再匯入多份每日報告。檢視日期與 OT 後，可輸出週報、雙週報或月報。</p>
         </div>
         <button type="button" data-action="add" class="h-11 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-sm">匯入日報</button>
       </div>
@@ -562,7 +584,7 @@
           <button type="button" data-action="next-month" class="w-10 h-10 rounded-xl border border-slate-200 font-black text-slate-700">›</button>
         </div>
         <div id="adminCalendar"></div>
-        <p class="mt-3 text-xs text-slate-500">黃底是已匯入日報的日子。日子上的 OT 表示該日有超時工作，一天可以有多於一份 OT 日報。點選日子後，週報會取該週星期一至日；雙週報取上一週星期一至本週星期日；月報取該月。</p>
+        <p class="mt-3 text-xs text-slate-500">黃底是已匯入日報的日子。日子上的 OT 表示該日有超時工作。同一日最好只用一份日報同時記錄日間和 OT；只有另一段不同超時，才再加一份 OT 日報。點選日子後，週報會取該週星期一至日；雙週報取上一週星期一至本週星期日；月報取該月。</p>
       </div>
     </div>
 
@@ -584,7 +606,9 @@
         <button type="button" data-action="export-excel" class="h-12 px-5 rounded-xl bg-green-700 hover:bg-green-800 text-white font-black">匯出 Excel</button>
       </div>
     </div>
-    <input type="file" id="adminExcelInput" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple class="hidden">
+    <input type="file" id="adminWordInput" accept=".docx" multiple class="sr-only">
+    <input type="file" id="adminExcelInput" accept=".xlsx" multiple class="sr-only">
+    <input type="file" id="adminJsonInput" accept=".json" multiple class="sr-only">
   </section>
 
   <!-- 全螢幕簽名 -->
@@ -3634,375 +3658,485 @@
       }
     }
 
-    const WORD_CRC_TABLE = (() => {
-      const table = new Uint32Array(256);
-      for (let i = 0; i < 256; i++) {
-        let c = i;
-        for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
-        table[i] = c >>> 0;
+    const DAILY_DOCX_FONT = 'Microsoft JhengHei';
+    const DAILY_DOCX_WIDTH = 10546;
+
+    function dailyDocxBorders() {
+      const line = { style: docx.BorderStyle.SINGLE, size: 8, color: '94A3B8' };
+      return { top: line, bottom: line, left: line, right: line };
+    }
+
+    function dailyDocxWidths(total, weights) {
+      const sum = weights.reduce((acc, weight) => acc + weight, 0);
+      const widths = weights.map(weight => Math.floor(total * weight / sum));
+      widths[widths.length - 1] += total - widths.reduce((acc, width) => acc + width, 0);
+      return widths;
+    }
+
+    function dailyDocxRun(text, options = {}) {
+      return new docx.TextRun({
+        text: text == null ? '' : String(text),
+        font: DAILY_DOCX_FONT,
+        size: options.size || 21,
+        bold: !!options.bold,
+        color: options.color || '111111'
+      });
+    }
+
+    function dailyDocxParagraph(text, options = {}) {
+      return new docx.Paragraph({
+        spacing: { before: options.before || 0, after: options.after == null ? 0 : options.after },
+        alignment: options.align || docx.AlignmentType.LEFT,
+        border: options.border,
+        shading: options.fill ? { type: docx.ShadingType.CLEAR, fill: options.fill } : undefined,
+        keepNext: options.keepNext,
+        children: Array.isArray(text) ? text : [dailyDocxRun(text, options)]
+      });
+    }
+
+    function dailyDocxCell(content, width, options = {}) {
+      let children;
+      if (content instanceof docx.Table) children = [content];
+      else if (Array.isArray(content)) children = content;
+      else {
+        children = [dailyDocxParagraph(content == null ? '' : String(content), {
+          bold: options.bold,
+          size: options.size,
+          color: options.color,
+          align: options.align
+        })];
       }
-      return table;
-    })();
-
-    function wordCrc32(bytes) {
-      let crc = 0xffffffff;
-      for (let i = 0; i < bytes.length; i++) crc = WORD_CRC_TABLE[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
-      return (crc ^ 0xffffffff) >>> 0;
-    }
-
-    function wordConcat(parts) {
-      const total = parts.reduce((sum, part) => sum + part.length, 0);
-      const out = new Uint8Array(total);
-      let offset = 0;
-      parts.forEach(part => {
-        out.set(part, offset);
-        offset += part.length;
+      return new docx.TableCell({
+        width: { size: width, type: docx.WidthType.DXA },
+        columnSpan: options.span,
+        shading: options.fill ? { type: docx.ShadingType.CLEAR, fill: options.fill } : undefined,
+        margins: options.margins || { top: 60, bottom: 60, left: 80, right: 80 },
+        verticalAlign: options.valign || docx.VerticalAlign.CENTER,
+        borders: options.borders || dailyDocxBorders(),
+        children
       });
-      return out;
     }
 
-    function wordU16(value) {
-      const bytes = new Uint8Array(2);
-      new DataView(bytes.buffer).setUint16(0, value & 0xffff, true);
-      return bytes;
-    }
-
-    function wordU32(value) {
-      const bytes = new Uint8Array(4);
-      new DataView(bytes.buffer).setUint32(0, value >>> 0, true);
-      return bytes;
-    }
-
-    function wordStoredZip(files) {
-      const encoder = new TextEncoder();
-      const locals = [];
-      const centrals = [];
-      let offset = 0;
-      files.forEach(file => {
-        const name = encoder.encode(file.name);
-        const data = file.data instanceof Uint8Array ? file.data : encoder.encode(String(file.data));
-        const crc = wordCrc32(data);
-        const local = wordConcat([
-          wordU32(0x04034b50), wordU16(20), wordU16(0), wordU16(0), wordU16(0), wordU16(0),
-          wordU32(crc), wordU32(data.length), wordU32(data.length), wordU16(name.length), wordU16(0),
-          name, data
-        ]);
-        const central = wordConcat([
-          wordU32(0x02014b50), wordU16(20), wordU16(20), wordU16(0), wordU16(0), wordU16(0), wordU16(0),
-          wordU32(crc), wordU32(data.length), wordU32(data.length), wordU16(name.length), wordU16(0), wordU16(0),
-          wordU16(0), wordU16(0), wordU32(0), wordU32(offset), name
-        ]);
-        locals.push(local);
-        centrals.push(central);
-        offset += local.length;
+    function dailyDocxTable(widths, rows) {
+      return new docx.Table({
+        width: { size: widths.reduce((sum, width) => sum + width, 0), type: docx.WidthType.DXA },
+        columnWidths: widths,
+        layout: docx.TableLayoutType.FIXED,
+        rows
       });
-      const centralDir = wordConcat(centrals);
-      const end = wordConcat([
-        wordU32(0x06054b50), wordU16(0), wordU16(0), wordU16(files.length), wordU16(files.length),
-        wordU32(centralDir.length), wordU32(offset), wordU16(0)
-      ]);
-      return wordConcat(locals.concat([centralDir, end]));
     }
 
-    // Word 會丟掉 HTML 裡的 data: 圖片。改包成 docx，簽名以附件貼進簽署格。
-    function buildWordMhtml(htmlSource) {
-      const imageParts = [];
-      const html = String(htmlSource).replace(/src="data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)"/g, (match, mime, base64) => {
-        const extension = mime.split('/')[1] === 'jpeg' ? 'jpg' : mime.split('/')[1];
-        const location = `file:///C:/fake/image${imageParts.length}.${extension}`;
-        imageParts.push(
-          '------=mhtDocumentPart\n' +
-          `Content-Type: ${mime}\n` +
-          'Content-Transfer-Encoding: base64\n' +
-          `Content-Location: ${location}\n\n` +
-          `${base64}\n`
-        );
-        return `src="${location}"`;
+    function dailyDocxHeaderRow(labels, widths, aligns) {
+      return new docx.TableRow({
+        tableHeader: true,
+        cantSplit: true,
+        children: labels.map((label, index) => dailyDocxCell(label, widths[index], {
+          fill: 'F1F5F9',
+          bold: true,
+          align: aligns ? aligns[index] : undefined
+        }))
       });
-      return 'MIME-Version: 1.0\n' +
-        'Content-Type: multipart/related;\n' +
-        '    type="text/html";\n' +
-        '    boundary="----=mhtDocumentPart"\n\n\n' +
-        '------=mhtDocumentPart\n' +
-        'Content-Type: text/html;\n' +
-        '    charset="utf-8"\n' +
-        'Content-Transfer-Encoding: quoted-printable\n' +
-        'Content-Location: file:///C:/fake/document.html\n\n' +
-        html.replace(/=/g, '=3D') +
-        '\n\n' +
-        imageParts.join('\n') +
-        '\n\n------=mhtDocumentPart--\n';
     }
 
-    function buildWordDocx(html) {
-      const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <w:body>
-    <w:altChunk r:id="htmlChunk"/>
-    <w:sectPr>
-      <w:pgSz w:w="11906" w:h="16838"/>
-      <w:pgMar w:top="680" w:right="680" w:bottom="680" w:left="680" w:header="284" w:footer="284" w:gutter="0"/>
-    </w:sectPr>
-  </w:body>
-</w:document>`;
-      const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-  <Override PartName="/word/afchunk.mht" ContentType="message/rfc822"/>
-</Types>`;
-      const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="/word/document.xml" Id="R09c83fafc067488e"/>
-</Relationships>`;
-      const documentRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk" Target="/word/afchunk.mht" Id="htmlChunk"/>
-</Relationships>`;
-      return wordStoredZip([
-        { name: '[Content_Types].xml', data: contentTypes },
-        { name: '_rels/.rels', data: rootRels },
-        { name: 'word/document.xml', data: documentXml },
-        { name: 'word/afchunk.mht', data: buildWordMhtml(html) },
-        { name: 'word/_rels/document.xml.rels', data: documentRels }
-      ]);
+    function dailyDocxHeading(text) {
+      return dailyDocxParagraph(text, {
+        bold: true,
+        size: 24,
+        before: 240,
+        after: 80,
+        keepNext: true,
+        border: { left: { style: docx.BorderStyle.SINGLE, size: 18, color: 'F59E0B', space: 8 } }
+      });
     }
 
-    function exportToWord() {
-      if (!ensureReportForExport()) return;
+    function dailyDocxLabeledLines(label, text, options = {}) {
+      const lines = String(text == null ? '' : text).split(/\r?\n/);
+      const first = lines.shift();
+      const paragraphs = [new docx.Paragraph({
+        shading: options.fill ? { type: docx.ShadingType.CLEAR, fill: options.fill } : undefined,
+        spacing: { before: 60, after: lines.length ? 0 : 60 },
+        children: [dailyDocxRun(`${label}：`, { bold: true }), dailyDocxRun(first || '')]
+      })];
+      lines.forEach((line, index) => {
+        paragraphs.push(dailyDocxParagraph(line, {
+          fill: options.fill,
+          before: 0,
+          after: index === lines.length - 1 ? 60 : 0
+        }));
+      });
+      return paragraphs;
+    }
 
-      const d = currentSavedReport;
-      const fileName = `${buildExportBaseName(d)}.docx`;
+    function dailyDocxProgressBar(percent, width) {
+      const inner = Math.max(240, width - 160);
+      const pct = normalizeProgressPercent(percent);
+      let filled = Math.round(inner * pct / 100);
+      if (pct > 0 && filled < 80) filled = Math.min(inner, 80);
+      if (pct >= 100) filled = inner;
+      const rest = inner - filled;
+      const color = pct >= 100 ? '10B981' : 'F59E0B';
+      const cells = [];
+      const columns = [];
+      const paint = (size, fill) => {
+        columns.push(size);
+        cells.push(new docx.TableCell({
+          width: { size, type: docx.WidthType.DXA },
+          shading: { type: docx.ShadingType.CLEAR, fill },
+          margins: { top: 0, bottom: 0, left: 0, right: 0 },
+          borders: docx.TableBorders.NONE,
+          children: [new docx.Paragraph({
+            spacing: { before: 0, after: 0 },
+            children: [new docx.TextRun({ text: '', font: DAILY_DOCX_FONT, size: 2 })]
+          })]
+        }));
+      };
+      if (filled > 0) paint(filled, color);
+      if (rest > 0) paint(rest, 'E2E8F0');
+      if (!cells.length) paint(inner, 'E2E8F0');
+      return new docx.Table({
+        width: { size: columns.reduce((sum, size) => sum + size, 0), type: docx.WidthType.DXA },
+        columnWidths: columns,
+        borders: docx.TableBorders.NONE,
+        layout: docx.TableLayoutType.FIXED,
+        rows: [new docx.TableRow({
+          height: { value: 140, rule: docx.HeightRule.EXACT },
+          cantSplit: true,
+          children: cells
+        })]
+      });
+    }
 
-      let locationRowsWord = '';
-      if (d.locations && d.locations.length > 0) {
-        locationRowsWord = d.locations.map(item => {
+    function dailyDocxPeriodTable(data, width) {
+      const columns = dailyDocxWidths(Math.max(1600, width - 160), [46, 24, 30]);
+      const rows = [dailyDocxHeaderRow(['時段', '人數', '時數'], columns, [
+        docx.AlignmentType.LEFT,
+        docx.AlignmentType.CENTER,
+        docx.AlignmentType.RIGHT
+      ])];
+      nightPeriodEntries(data).forEach(entry => {
+        rows.push(new docx.TableRow({
+          cantSplit: true,
+          children: [
+            dailyDocxCell(entry.range, columns[0], { size: 20 }),
+            dailyDocxCell(`${entry.people} 人`, columns[1], { size: 20, align: docx.AlignmentType.CENTER }),
+            dailyDocxCell(entry.hours, columns[2], { size: 20, align: docx.AlignmentType.RIGHT })
+          ]
+        }));
+      });
+      const total = formatHourCount(nightPeriodsTotalMinutes(data && data.nightPeriods));
+      rows.push(new docx.TableRow({
+        cantSplit: true,
+        children: [
+          dailyDocxCell('總時數', columns[0] + columns[1], { span: 2, bold: true, size: 20 }),
+          dailyDocxCell(`${total} 小時`, columns[2], { bold: true, size: 20, align: docx.AlignmentType.RIGHT })
+        ]
+      }));
+      return dailyDocxTable(columns, rows);
+    }
+
+    function dailyDocxStaffDetail(item) {
+      const paragraphs = [];
+      (item.periods || []).forEach(period => {
+        const minutes = minutesBetween(period.start, period.end);
+        const range = (period.start || period.end) ? `${period.start || '—'}–${period.end || '—'}` : '';
+        const duration = minutes == null ? '' : formatDurationHm(minutes);
+        const head = [range, duration].filter(Boolean).join('　');
+        const work = formatOfficeWork(period);
+        if (head) paragraphs.push(dailyDocxParagraph(head, { size: 20, before: paragraphs.length ? 80 : 0 }));
+        if (work) paragraphs.push(dailyDocxParagraph(work, { size: 20, before: head ? 20 : (paragraphs.length ? 80 : 0) }));
+      });
+      if (item.totalText) paragraphs.push(dailyDocxParagraph(`合計 ${item.totalText}`, { bold: true, size: 20, before: 80 }));
+      return paragraphs.length ? paragraphs : [dailyDocxParagraph('')];
+    }
+
+    function buildDailyDocx(d) {
+      const infoWidths = dailyDocxWidths(DAILY_DOCX_WIDTH, [20, 30, 20, 30]);
+      const locationWidths = dailyDocxWidths(DAILY_DOCX_WIDTH, [30, 15, 55]);
+      const progressWidths = dailyDocxWidths(DAILY_DOCX_WIDTH, [45, 15, 40]);
+      const materialWidths = dailyDocxWidths(DAILY_DOCX_WIDTH, [50, 50]);
+      const officeStaff = officeStaffWithNames(d);
+      const officeStaffShowDetail = officeStaff.some(officeStaffHasDetail);
+      const staffWidths = officeStaffShowDetail
+        ? dailyDocxWidths(DAILY_DOCX_WIDTH, [22, 16, 62])
+        : dailyDocxWidths(DAILY_DOCX_WIDTH, [50, 50]);
+      const material = d.materialDelivery || {};
+      const inspections = d.inspections || {};
+      const mosi = inspections.mosi || {};
+      const otherInspection = inspections.other || {};
+      const safety = d.safety || {};
+      const injury = safety.injury || {};
+      const obstacles = safety.obstacles || {};
+      const children = [];
+
+      children.push(dailyDocxParagraph('DAILY REPORT', {
+        bold: true,
+        size: 44,
+        align: docx.AlignmentType.CENTER,
+        after: 80
+      }));
+      children.push(dailyDocxParagraph('地盤電力工程每日施工記錄表', {
+        bold: true,
+        size: 32,
+        align: docx.AlignmentType.CENTER,
+        after: 40,
+        border: { bottom: { style: docx.BorderStyle.SINGLE, size: 12, color: '0F172A', space: 1 } }
+      }));
+      children.push(dailyDocxParagraph([d.siteName, d.contractNo, d.contractorName].filter(Boolean).join('｜'), {
+        size: 21,
+        align: docx.AlignmentType.CENTER,
+        before: 80,
+        after: 160
+      }));
+
+      const infoRows = [
+        ['地盤名稱：', d.siteName || '未填寫', '項目編號：', d.contractNo || '未填寫'],
+        ['承建商：', d.contractorName || '未填寫', '記錄日期：', recordDateText(d)],
+        ['填報人員：', d.recorder || '', `${headcountCaption()}：`, `${d.totalHeadcount || 0} 人`],
+        ['當日天氣/警告：', d.weather || '', '警告時段：', warningPeriodOf(d)]
+      ].map(row => new docx.TableRow({
+        cantSplit: true,
+        children: row.map((value, index) => dailyDocxCell(value, infoWidths[index], {
+          fill: 'F8FAFC',
+          bold: index % 2 === 0 || (index === 3 && String(row[2]).includes('人數'))
+        }))
+      }));
+      infoRows.push(new docx.TableRow({
+        cantSplit: true,
+        children: [
+          dailyDocxCell('停工時段：', infoWidths[0], { fill: 'F8FAFC', bold: true }),
+          dailyDocxCell(stopPeriodOf(d), infoWidths[1] + infoWidths[2] + infoWidths[3], { fill: 'F8FAFC', span: 3 })
+        ]
+      }));
+      if (d.nightShift) {
+        const periodWidth = infoWidths[1] + infoWidths[2] + infoWidths[3];
+        const periods = nightPeriodEntries(d);
+        infoRows.push(new docx.TableRow({
+          cantSplit: true,
+          children: [
+            dailyDocxCell('超時人數：', infoWidths[0], { fill: 'F8FAFC', bold: true }),
+            dailyDocxCell(`${reportOtHeadcount(d)} 人`, infoWidths[1], { fill: 'F8FAFC', bold: true }),
+            dailyDocxCell('超時工作時段：', infoWidths[2], { fill: 'F8FAFC', bold: true }),
+            dailyDocxCell(nightRangeOf(d), infoWidths[3], { fill: 'F8FAFC' })
+          ]
+        }));
+        infoRows.push(new docx.TableRow({
+          cantSplit: true,
+          children: [
+            dailyDocxCell('超時工作時段人數：', infoWidths[0], { fill: 'F8FAFC', bold: true }),
+            dailyDocxCell(periods.length ? dailyDocxPeriodTable(d, periodWidth) : '無', periodWidth, { fill: 'F8FAFC', span: 3 })
+          ]
+        }));
+      }
+      children.push(dailyDocxTable(infoWidths, infoRows));
+
+      children.push(dailyDocxHeading('1. 人力開工分佈與電力工種明細'));
+      const locationRows = [dailyDocxHeaderRow(
+        ['工作地點 / 樓層', '人數', '工種分類與備註'],
+        locationWidths,
+        [docx.AlignmentType.LEFT, docx.AlignmentType.CENTER, docx.AlignmentType.LEFT]
+      )];
+      if (d.locations && d.locations.length) {
+        d.locations.forEach(item => {
           const catsText = Array.isArray(item.categories) ? item.categories.join('、') : (item.category || '');
           const subsText = Array.isArray(item.subCategories) ? item.subCategories.join('、') : (item.subCategory || '');
           const ot = locationMarkedOt(item, d.nightShift);
-          return `
-            <tr>
-              <td style="padding: 5pt; border: 1px solid #94a3b8; font-weight: bold; width: 30%; word-break: break-all;">${withOtMark(item.location, item, d)}</td>
-              <td style="padding: 5pt; border: 1px solid #94a3b8; text-align: center; font-weight: bold; width: 15%;">${item.workers} 人</td>
-              <td style="padding: 5pt; border: 1px solid #94a3b8; width: 55%; word-break: break-word;">
-                <div style="font-weight: bold;">${ot ? '(OT) ' : ''}${catsText}</div>
-                <div style="margin-top: 2pt;">${ot ? '(OT) ' : ''}${subsText}</div>
-                ${item.remark ? `<div style="margin-top: 2pt;">備註：${item.remark}</div>` : ''}
-              </td>
-            </tr>
-          `;
-        }).join('');
+          const prefix = ot ? '(OT) ' : '';
+          const trades = [
+            dailyDocxParagraph(`${prefix}${catsText}`, { bold: true }),
+            dailyDocxParagraph(`${prefix}${subsText}`, { before: 40 })
+          ];
+          if (item.remark) trades.push(dailyDocxParagraph(`備註：${item.remark}`, { before: 40 }));
+          locationRows.push(new docx.TableRow({
+            cantSplit: true,
+            children: [
+              dailyDocxCell(withOtMark(item.location, item, d), locationWidths[0], { bold: true }),
+              dailyDocxCell(`${item.workers} 人`, locationWidths[1], { bold: true, align: docx.AlignmentType.CENTER }),
+              dailyDocxCell(trades, locationWidths[2], { valign: docx.VerticalAlign.TOP })
+            ]
+          }));
+        });
       } else {
-        locationRowsWord = `<tr><td colspan="3" style="padding: 8pt; text-align: center; border: 1px solid #94a3b8; color: #94a3b8;">當天無分佈明細</td></tr>`;
+        locationRows.push(new docx.TableRow({
+          children: [dailyDocxCell('當天無分佈明細', DAILY_DOCX_WIDTH, {
+            span: 3,
+            align: docx.AlignmentType.CENTER,
+            color: '94A3B8'
+          })]
+        }));
       }
+      children.push(dailyDocxTable(locationWidths, locationRows));
 
-      let progressRowsWord = '';
-      if (d.workProgress && d.workProgress.length > 0) {
-        progressRowsWord = d.workProgress.map(p => {
-          const percent = normalizeProgressPercent(p.percent);
-          const remain = normalizeProgressPercent(100 - percent);
-          return `
-          <tr>
-            <td style="padding: 4pt 6pt; border: 1px solid #cbd5e1; font-weight: bold; width: 45%;">${p.title}</td>
-            <td style="padding: 4pt 6pt; border: 1px solid #cbd5e1; text-align: center; font-weight: bold; width: 15%;">${formatProgressPercent(percent)}%</td>
-            <td style="padding: 4pt 6pt; border: 1px solid #cbd5e1; width: 40%; vertical-align: middle;">
-              <table style="width: 100%; border: none; margin: 0; background-color: #e2e8f0; height: 10pt; border-collapse: collapse;">
-                <tr>
-                  <td style="width: ${percent}%; background-color: ${percent >= 100 ? '#10b981' : '#f59e0b'}; border: none; height: 10pt; padding: 0;"></td>
-                  <td style="width: ${remain}%; border: none; height: 10pt; padding: 0;"></td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        `;
-        }).join('');
+      children.push(dailyDocxHeading('2. 地盤施工進度 (Site Work Done Progress)'));
+      const progressRows = [dailyDocxHeaderRow(
+        ['施工工序 / 項目', '完工 %', '進度圖表 (Progress Bar)'],
+        progressWidths,
+        [docx.AlignmentType.LEFT, docx.AlignmentType.CENTER, docx.AlignmentType.LEFT]
+      )];
+      if (d.workProgress && d.workProgress.length) {
+        d.workProgress.forEach(item => {
+          const percent = normalizeProgressPercent(item.percent);
+          progressRows.push(new docx.TableRow({
+            cantSplit: true,
+            children: [
+              dailyDocxCell(item.title || '', progressWidths[0], { bold: true }),
+              dailyDocxCell(`${formatProgressPercent(percent)}%`, progressWidths[1], { bold: true, align: docx.AlignmentType.CENTER }),
+              dailyDocxCell(dailyDocxProgressBar(percent, progressWidths[2]), progressWidths[2])
+            ]
+          }));
+        });
       } else {
-        progressRowsWord = `<tr><td colspan="3" style="padding: 6pt; text-align: center; border: 1px solid #cbd5e1; color: #94a3b8;">無施工進度記錄</td></tr>`;
+        progressRows.push(new docx.TableRow({
+          children: [dailyDocxCell('無施工進度記錄', DAILY_DOCX_WIDTH, {
+            span: 3,
+            align: docx.AlignmentType.CENTER,
+            color: '94A3B8'
+          })]
+        }));
       }
+      children.push(dailyDocxTable(progressWidths, progressRows));
 
-      // Word 報告簽名格：嚴格 1:1 小正方形 (100pt x 100pt)。data 圖片會在打包時改成附件。
-      const sigImgTag = (d.signatures && d.signatures.engineer)
-        ? `<img src="${d.signatures.engineer}" width="133" height="133" style="width: 100pt; height: 100pt; max-width: 100pt; max-height: 100pt;" alt="簽名" />`
-        : `<span style="color: #64748b; display: block; text-align: center; line-height: 100pt;">(未簽署)</span>`;
+      children.push(dailyDocxHeading('3. 物料點收與地盤檢驗 (Site Inspections)'));
+      const mosiText = mosi.hasMosi ? `${mosi.item || ''} [${mosi.result || ''}]`.trim() : '無';
+      const otherText = otherInspection.hasOther ? (otherInspection.details || '') : '無';
+      const inspectionLines = [
+        dailyDocxParagraph([dailyDocxRun('MOSI 驗收：', { bold: true }), dailyDocxRun(mosiText)]),
+        dailyDocxParagraph([dailyDocxRun('工序檢查：', { bold: true }), dailyDocxRun(otherText)], { before: 60 })
+      ];
+      children.push(dailyDocxTable(materialWidths, [
+        new docx.TableRow({
+          tableHeader: true,
+          cantSplit: true,
+          children: [
+            dailyDocxCell('物料運抵點收', materialWidths[0], { fill: 'F1F5F9', bold: true }),
+            dailyDocxCell('MOSI 及工序檢查', materialWidths[1], { fill: 'F1F5F9', bold: true })
+          ]
+        }),
+        new docx.TableRow({
+          cantSplit: true,
+          children: [
+            dailyDocxCell(material.hasArrival ? (material.details || '') : '當天無物料運抵地盤', materialWidths[0], { valign: docx.VerticalAlign.TOP }),
+            dailyDocxCell(inspectionLines, materialWidths[1], { valign: docx.VerticalAlign.TOP })
+          ]
+        })
+      ]));
 
-      const officeStaff = officeStaffWithNames(d);
-      const officeStaffShowDetail = officeStaff.some(officeStaffHasDetail);
-      const wordHtml = `
-        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-        <head>
-          <meta charset="utf-8">
-          <title>地盤電力工程每日施工記錄表</title>
-          <!--[if gte mso 9]>
-          <xml>
-            <w:WordDocument>
-              <w:View>Print</w:View>
-              <w:Zoom>100</w:Zoom>
-              <w:DoNotOptimizeForBrowser/>
-            </w:WordDocument>
-          </xml>
-          <![endif]-->
-          <style>
-            @page Section1 {
-              size: 21.0cm 29.7cm;
-              margin: 1.2cm 1.2cm 1.2cm 1.2cm;
-              mso-header-margin: 0.5cm;
-              mso-footer-margin: 0.5cm;
+      children.push(dailyDocxHeading('4. 安全工傷與進度阻礙狀況'));
+      const injuryFill = injury.hasInjury ? 'FEF2F2' : 'F8FAFC';
+      children.push(...dailyDocxLabeledLines('工傷事故', injury.hasInjury ? (injury.details || '') : '零工傷 (Nil)', { fill: injuryFill }));
+      children.push(...dailyDocxLabeledLines('進度受阻', obstacles.hasObstacle ? (obstacles.details || '') : '無受阻事項', { fill: 'F8FAFC' }));
+
+      children.push(dailyDocxHeading('5. 辦公室人員 (OFFICE STAFF)'));
+      const staffRows = [dailyDocxHeaderRow(
+        officeStaffShowDetail ? ['職位', '姓名', '時間及工作'] : ['職位', '姓名'],
+        staffWidths
+      )];
+      if (officeStaff.length) {
+        officeStaff.forEach(item => {
+          const cells = [
+            dailyDocxCell(item.role || '', staffWidths[0], { bold: true, valign: docx.VerticalAlign.TOP }),
+            dailyDocxCell(item.name || '', staffWidths[1], { valign: docx.VerticalAlign.TOP })
+          ];
+          if (officeStaffShowDetail) {
+            cells.push(dailyDocxCell(officeStaffHasDetail(item) ? dailyDocxStaffDetail(item) : [dailyDocxParagraph('')], staffWidths[2], { valign: docx.VerticalAlign.TOP }));
+          }
+          staffRows.push(new docx.TableRow({ cantSplit: true, children: cells }));
+        });
+      } else {
+        staffRows.push(new docx.TableRow({
+          children: [dailyDocxCell('無', DAILY_DOCX_WIDTH, {
+            span: officeStaffShowDetail ? 3 : 2,
+            align: docx.AlignmentType.CENTER,
+            color: '94A3B8'
+          })]
+        }));
+      }
+      children.push(dailyDocxTable(staffWidths, staffRows));
+
+      children.push(dailyDocxHeading('6. 駐地盤工程代表核實簽署'));
+      const signatureWidth = 3400;
+      const signatureImage = d.signatures && d.signatures.engineer;
+      const signatureBody = signatureImage
+        ? [new docx.Paragraph({
+            alignment: docx.AlignmentType.CENTER,
+            spacing: { before: 40, after: 40 },
+            children: [new docx.ImageRun({
+              data: signatureImage,
+              transformation: { width: 133, height: 133 }
+            })]
+          })]
+        : [dailyDocxParagraph('(未簽署)', { color: '64748B', align: docx.AlignmentType.CENTER })];
+      children.push(new docx.Table({
+        width: { size: signatureWidth, type: docx.WidthType.DXA },
+        columnWidths: [signatureWidth],
+        layout: docx.TableLayoutType.FIXED,
+        alignment: docx.AlignmentType.LEFT,
+        rows: [
+          new docx.TableRow({
+            cantSplit: true,
+            children: [dailyDocxCell('(駐地盤代表)', signatureWidth, { fill: 'F8FAFC', bold: true })]
+          }),
+          new docx.TableRow({
+            cantSplit: true,
+            height: { value: 2200, rule: docx.HeightRule.ATLEAST },
+            children: [new docx.TableCell({
+              width: { size: signatureWidth, type: docx.WidthType.DXA },
+              shading: { type: docx.ShadingType.CLEAR, fill: 'FFFFFF' },
+              margins: { top: 40, bottom: 40, left: 80, right: 80 },
+              verticalAlign: docx.VerticalAlign.CENTER,
+              borders: dailyDocxBorders(),
+              children: signatureBody
+            })]
+          })
+        ]
+      }));
+      children.push(new docx.Table({
+        width: { size: signatureWidth, type: docx.WidthType.DXA },
+        columnWidths: [signatureWidth],
+        borders: docx.TableBorders.NONE,
+        layout: docx.TableLayoutType.FIXED,
+        rows: [new docx.TableRow({
+          children: [new docx.TableCell({
+            width: { size: signatureWidth, type: docx.WidthType.DXA },
+            borders: docx.TableBorders.NONE,
+            margins: { top: 60, bottom: 0, left: 0, right: 0 },
+            children: [dailyDocxParagraph(d.recorder || '（未填寫填報人）', { bold: true, align: docx.AlignmentType.CENTER })]
+          })]
+        })]
+      }));
+
+      return new docx.Document({
+        creator: '地盤電力工程每日記錄系統',
+        title: '地盤電力工程每日施工記錄表',
+        styles: {
+          default: {
+            document: {
+              run: { font: DAILY_DOCX_FONT, size: 21 }
             }
-            div.Section1 { page: Section1; }
-            body { font-family: "Microsoft JhengHei", "微軟正黑體", Arial, sans-serif; font-size: 10.5pt; color: #111111; line-height: 1.4; margin: 0; padding: 0; }
-            h1 { font-size: 16pt; font-weight: bold; text-align: center; margin: 0; color: #111111; }
-            h2 { font-size: 12pt; font-weight: bold; margin: 8pt 0 4pt 0; color: #111111; border-left: 3pt solid #f59e0b; padding-left: 5pt; page-break-after: avoid; }
-            table { width: 100% !important; max-width: 100% !important; border-collapse: collapse; table-layout: fixed; margin-top: 3pt; margin-bottom: 6pt; }
-            th { background-color: #f1f5f9; border: 1px solid #94a3b8; padding: 5pt; text-align: left; font-size: 10.5pt; font-weight: bold; color: #111111; }
-            td { border: 1px solid #cbd5e1; padding: 5pt; font-size: 10.5pt; line-height: 1.4; color: #111111; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
-            .box { background-color: #f8fafc; border: 1px solid #cbd5e1; padding: 6pt; border-radius: 4pt; margin-bottom: 6pt; font-size: 10.5pt; line-height: 1.4; word-wrap: break-word; }
-            /* 左下角小正方形簽名表格樣式 */
-            .sig-table-square { width: 170pt !important; margin-left: 0 !important; margin-right: auto !important; border: 1px solid #cbd5e1; page-break-inside: avoid; }
-          </style>
-        </head>
-        <body>
-          <div class="Section1">
-            <div style="text-align: center; border-bottom: 1.5pt solid #0f172a; padding-bottom: 5pt; margin-bottom: 8pt;">
-              <div style="margin-bottom: 6pt; background: transparent; color: #000000; font-size: 22pt; font-weight: 900; letter-spacing: 0.5pt; line-height: 1.2;">DAILY REPORT</div>
-              <h1>地盤電力工程每日施工記錄表</h1>
-              <div style="font-size: 10.5pt; color: #111111; margin-top: 3pt;">${[d.siteName, d.contractNo, d.contractorName].filter(Boolean).join('｜')}</div>
-            </div>
+          }
+        },
+        sections: [{
+          properties: {
+            page: {
+              size: { width: 11906, height: 16838 },
+              margin: { top: 680, right: 680, bottom: 680, left: 680, header: 284, footer: 284 }
+            }
+          },
+          children
+        }]
+      });
+    }
 
-            <table>
-              <tr style="background-color: #f8fafc;">
-                <td style="width: 20%; font-weight: bold;">地盤名稱：</td>
-                <td style="width: 30%;">${d.siteName || '未填寫'}</td>
-                <td style="width: 20%; font-weight: bold;">項目編號：</td>
-                <td style="width: 30%;">${d.contractNo || '未填寫'}</td>
-              </tr>
-              <tr style="background-color: #f8fafc;">
-                <td style="font-weight: bold;">承建商：</td>
-                <td>${d.contractorName || '未填寫'}</td>
-                <td style="font-weight: bold;">記錄日期：</td>
-                <td>${recordDateText(d)}</td>
-              </tr>
-              <tr style="background-color: #f8fafc;">
-                <td style="font-weight: bold;">填報人員：</td>
-                <td>${d.recorder}</td>
-                <td style="font-weight: bold;">${headcountCaption(d)}：</td>
-                <td style="font-weight: bold;">${d.totalHeadcount} 人 </td>
-              </tr>
-              <tr style="background-color: #f8fafc;">
-                <td style="font-weight: bold;">當日天氣/警告：</td>
-                <td>${d.weather}</td>
-                <td style="font-weight: bold;">警告時段：</td>
-                <td>${warningPeriodOf(d)}</td>
-              </tr>
-              <tr style="background-color: #f8fafc;">
-                <td style="font-weight: bold;">停工時段：</td>
-                <td colspan="3">${stopPeriodOf(d)}</td>
-              </tr>
-              ${d.nightShift ? `
-              <tr style="background-color: #f8fafc;">
-                <td style="font-weight: bold;">超時人數：</td>
-                <td style="font-weight: bold;">${reportOtHeadcount(d)} 人</td>
-                <td style="font-weight: bold;">超時工作時段：</td>
-                <td>${nightRangeOf(d)}</td>
-              </tr>
-              <tr style="background-color: #f8fafc;">
-                <td style="font-weight: bold;">超時工作時段人數：</td>
-                <td colspan="3">${nightPeriodTableHtml(d)}</td>
-              </tr>` : ''}
-            </table>
+    async function exportToWord() {
+      if (!ensureReportForExport()) return;
+      if (!window.docx || !docx.Document || !docx.Packer) {
+        alertModal('匯出失敗', 'Word 元件未載入。請確認 vendor 資料夾與程式放在一起。');
+        return;
+      }
 
-            <h2>1. 人力開工分佈與電力工種明細</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th style="width: 30%;">工作地點 / 樓層</th>
-                  <th style="width: 15%; text-align: center;">人數</th>
-                  <th style="width: 55%;">工種分類與備註</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${locationRowsWord}
-              </tbody>
-            </table>
-
-            <h2>2. 地盤施工進度 (Site Work Done Progress)</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th style="width: 45%;">施工工序 / 項目</th>
-                  <th style="width: 15%; text-align: center;">完工 %</th>
-                  <th style="width: 40%;">進度圖表 (Progress Bar)</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${progressRowsWord}
-              </tbody>
-            </table>
-
-            <h2>3. 物料點收與地盤檢驗 (Site Inspections)</h2>
-            <table>
-              <tr>
-                <td style="width: 50%; font-weight: bold; background-color: #f1f5f9;">物料運抵點收</td>
-                <td style="width: 50%; font-weight: bold; background-color: #f1f5f9;">MOSI 及工序檢查</td>
-              </tr>
-              <tr>
-                <td>${d.materialDelivery.hasArrival ? d.materialDelivery.details : '當天無物料運抵地盤'}</td>
-                <td>
-                  MOSI 驗收：${d.inspections.mosi.hasMosi ? `${d.inspections.mosi.item} [${d.inspections.mosi.result}]` : '無'}<br>
-                  工序檢查：${d.inspections.other.hasOther ? d.inspections.other.details : '無'}
-                </td>
-              </tr>
-            </table>
-
-            <h2>4. 安全工傷與進度阻礙狀況</h2>
-            <div class="box" style="${d.safety.injury.hasInjury ? 'border: 1px solid #f87171; background-color: #fef2f2;' : ''}">
-              <strong>工傷事故：</strong> ${d.safety.injury.hasInjury ? d.safety.injury.details : '零工傷 (Nil)'}<br>
-              <strong>進度受阻：</strong> ${d.safety.obstacles.hasObstacle ? d.safety.obstacles.details : '無受阻事項'}
-            </div>
-
-            <h2>5. 辦公室人員 (OFFICE STAFF)</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th style="width: ${officeStaffShowDetail ? '22%' : '50%'};">職位</th>
-                  <th style="width: ${officeStaffShowDetail ? '16%' : '50%'};">姓名</th>
-                  ${officeStaffShowDetail ? '<th style="width: 62%;">時間及工作</th>' : ''}
-                </tr>
-              </thead>
-              <tbody>
-                ${officeStaff.length
-                  ? officeStaff.map(item => `
-                    <tr>
-                      <td style="font-weight: bold;">${escapeHtml(item.role)}</td>
-                      <td>${escapeHtml(item.name)}</td>
-                      ${officeStaffShowDetail ? `<td>${officeStaffHasDetail(item) ? officeStaffDetailHtml(item) : ''}</td>` : ''}
-                    </tr>`).join('')
-                  : `<tr><td colspan="${officeStaffShowDetail ? 3 : 2}" style="text-align: center; color: #94a3b8;">無</td></tr>`}
-              </tbody>
-            </table>
-
-            <div style="page-break-inside: avoid; margin-top: 10pt;">
-              <h2>6. 駐地盤工程代表核實簽署</h2>
-              <table class="sig-table-square">
-                <tr>
-                  <th style="text-align: left; padding: 4pt 6pt; background-color: #f8fafc;">
-                    (駐地盤代表)
-                  </th>
-                </tr>
-                <tr>
-                  <td style="height: 105pt; text-align: center; vertical-align: middle; padding: 4pt; background-color: #ffffff;">
-                    ${sigImgTag}
-                  </td>
-                </tr>
-              </table>
-              <div style="width: 170pt; margin-top: 4pt; text-align: center; font-weight: bold;">${d.recorder || '（未填寫填報人）'}</div>
-            </div>
-          </div>
-        </body>
-        </html>
-      `;
-
+      const d = currentSavedReport;
+      const fileName = `${buildExportBaseName(d)}.docx`;
       try {
-        const blob = new Blob([buildWordDocx(wordHtml)], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        const blob = await docx.Packer.toBlob(buildDailyDocx(d));
         const objectUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = objectUrl;
@@ -4013,10 +4147,10 @@
           document.body.removeChild(a);
           URL.revokeObjectURL(objectUrl);
         }, 500);
-        alertModal("Word 報告匯出成功", `已成功儲存檔案：\n${fileName}`);
+        alertModal('Word 報告匯出成功', `已成功儲存檔案：\n${fileName}`);
       } catch (err) {
-        console.error("Word 匯出失敗:", err);
-        alertModal("匯出失敗", "無法建立 Word 檔案，請檢查瀏覽器設定。");
+        console.error('Word 匯出失敗:', err);
+        alertModal('匯出失敗', '無法建立 Word 檔案，請檢查瀏覽器設定。');
       }
     }
 

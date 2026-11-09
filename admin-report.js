@@ -18,7 +18,7 @@ const reportText = {
     monthly: '月報',
     title: '地盤電力工程',
     period: '報告期間',
-    prepared: '本報告由每日 Excel 或專檔彙整，資料留在本機。',
+    prepared: '本報告由每日 Word、Excel 或專檔彙整，資料留在本機。',
     files: '日報份數',
     reportedDays: '有日報日數',
     missingDays: '未有日報',
@@ -32,6 +32,9 @@ const reportText = {
     noReport: '無日報',
     daytime: '日間',
     ot: '超時工作',
+    mixed: '日間＋OT',
+    hoursUnit: '小時',
+    staffWork: '時間及工作',
     site: '地盤名稱',
     contract: '項目編號',
     contractor: '承建商',
@@ -49,7 +52,7 @@ const reportText = {
     daily: '每日內容',
     charts: '圖表',
     noteTitle: '讀數說明',
-    note: '日間開工人日只加總沒有 OT 標記的日報，避免與超時工作人數重疊。同一日若有多份 OT 日報，代表多於一段超時工作，人數會分開列出；完全相同的 OT 時段只保留較新檔案。工作範疇的涉及人數按地點人數記入每一個相關工種，不可把各工種人數相加當作總開工人數。',
+    note: '日間人數只計沒有勾選 OT 的地點。OT 人數只計已勾 OT 的地點。OT 人時數是各超時時段的時數乘該時段人數。同一份日報可以同時有日間和 OT，兩項都會列出。同一日若有多份 OT 日報，代表多於一段超時工作；完全相同的 OT 時段只保留較新檔案。工作範疇的涉及人數按地點人數記入每一個相關工種，不可把各工種人數相加當作總開工人數。',
     category: '工種大類',
     involved: '日間涉及人數',
     otInvolved: 'OT 涉及人數',
@@ -105,6 +108,9 @@ const reportText = {
     noReport: 'No daily report',
     daytime: 'Daytime',
     ot: 'Overtime',
+    mixed: 'Daytime + OT',
+    hoursUnit: 'person-hours',
+    staffWork: 'Time and work',
     site: 'Site',
     contract: 'Contract No.',
     contractor: 'Contractor',
@@ -122,7 +128,7 @@ const reportText = {
     daily: 'Daily records',
     charts: 'Charts',
     noteTitle: 'How the figures are counted',
-    note: 'Daytime man-days add only daily files that are not marked OT, so overtime crews are not mixed into the daytime total. More than one OT file on the same date means more than one overtime session. An identical OT session keeps the newer file only. Category headcount is the location headcount recorded against each trade; do not add trades together to recreate the site total.',
+    note: 'Daytime headcount counts only locations that are not marked OT. OT headcount counts locations marked OT. OT person-hours are each overtime session’s hours multiplied by the people in that session. One daily file can contain both daytime work and OT, and both are shown. More than one OT file on the same date means more than one overtime session. An identical OT session keeps the newer file only. Category headcount is the location headcount recorded against each trade; do not add trades together to recreate the site total.',
     category: 'Trade category',
     involved: 'Daytime involved',
     otInvolved: 'OT involved',
@@ -288,7 +294,9 @@ function readSheetObjects(workbook, sheetName) {
 function detectOt(record) {
   const summary = record.summary || {};
   if (adminIsYes(summary.nightShift)) return true;
+  if (adminNum(summary.overtimeHeadcount) > 0) return true;
   if (adminNum(summary.overtimePersonHours) > 0) return true;
+  if ((record.locations || []).some(location => locationRowIsOt(location) === true)) return true;
   return (record.periods || []).some(period => String(period.start || '').trim() || String(period.end || '').trim() || adminNum(period.workers) > 0);
 }
 
@@ -524,8 +532,19 @@ function decodeQuotedPrintable(bytes) {
   return new TextDecoder('utf-8').decode(new Uint8Array(out));
 }
 
+function wordBlockText(node) {
+  if (!node) return '';
+  if (node.nodeType === 3) return node.nodeValue || '';
+  if (node.nodeType !== 1) return '';
+  const name = node.tagName;
+  if (name === 'BR') return '\n';
+  if (name === 'TABLE') return `${wordRows(node).map(cells => cells.join('\t')).join('\n')}\n`;
+  const children = Array.from(node.childNodes).map(wordBlockText).join('');
+  return /^(DIV|P|H[1-6]|LI|TR)$/.test(name) ? `${children}\n` : children;
+}
+
 function wordCellText(cell) {
-  return String(cell.innerText || cell.textContent || '').replace(/\u00a0/g, ' ').replace(/[ \t]+\n/g, '\n').trim();
+  return wordBlockText(cell).replace(/\u00a0/g, ' ').replace(/[ \t]+\n/g, '\n').trim();
 }
 
 function wordRows(table) {
@@ -562,31 +581,134 @@ function wordRange(value) {
   return match ? [padClock(match[1]), padClock(match[2])] : ['', ''];
 }
 
+function wordLocalName(node) {
+  if (!node || node.nodeType !== 1) return '';
+  return node.localName || String(node.nodeName || '').replace(/^[^:]*:/, '');
+}
+
+function wordXmlInlineText(node) {
+  let text = '';
+  const children = node.childNodes;
+  for (let index = 0; index < children.length; index += 1) {
+    const child = children[index];
+    if (child.nodeType === 3) {
+      text += child.nodeValue || '';
+      continue;
+    }
+    if (child.nodeType !== 1) continue;
+    const name = wordLocalName(child);
+    if (name === 'tbl' || name === 'drawing' || name === 'pict' || name === 'instrText' || name === 'delText') continue;
+    if (name === 'tab') text += '\t';
+    else if (name === 'br' || name === 'cr') text += '\n';
+    else text += wordXmlInlineText(child);
+  }
+  return text;
+}
+
+function wordBlockHasDrawing(node) {
+  const nodes = node.getElementsByTagName('*');
+  for (let index = 0; index < nodes.length; index += 1) {
+    const name = wordLocalName(nodes[index]);
+    if (name === 'drawing' || name === 'pict' || name === 'blip') return true;
+  }
+  return false;
+}
+
+function wordTableToHtml(tableNode, html) {
+  const table = html.createElement('table');
+  const children = tableNode.childNodes;
+  for (let index = 0; index < children.length; index += 1) {
+    if (wordLocalName(children[index]) !== 'tr') continue;
+    const row = html.createElement('tr');
+    const cells = children[index].childNodes;
+    for (let cellIndex = 0; cellIndex < cells.length; cellIndex += 1) {
+      if (wordLocalName(cells[cellIndex]) !== 'tc') continue;
+      const cell = html.createElement('td');
+      appendWordBlocks(cells[cellIndex], cell, html);
+      row.appendChild(cell);
+    }
+    table.appendChild(row);
+  }
+  return table;
+}
+
+function appendWordBlocks(source, target, html) {
+  const children = source.childNodes;
+  for (let index = 0; index < children.length; index += 1) {
+    const child = children[index];
+    if (child.nodeType !== 1) continue;
+    const name = wordLocalName(child);
+    if (name === 'p') {
+      const block = html.createElement('div');
+      block.textContent = wordXmlInlineText(child);
+      if (wordBlockHasDrawing(child)) {
+        const image = html.createElement('img');
+        image.alt = '簽名';
+        block.appendChild(image);
+      }
+      target.appendChild(block);
+    } else if (name === 'tbl') {
+      target.appendChild(wordTableToHtml(child, html));
+    } else if (name === 'sdt' || name === 'sdtContent' || name === 'customXml' || name === 'hyperlink') {
+      appendWordBlocks(child, target, html);
+    }
+  }
+}
+
+function wordXmlToHtmlDocument(xmlText) {
+  const xml = new DOMParser().parseFromString(xmlText, 'application/xml');
+  if (xml.getElementsByTagName('parsererror').length) throw new Error('每日 Word 的內容未能讀取。');
+  const nodes = xml.getElementsByTagName('*');
+  let body = null;
+  for (let index = 0; index < nodes.length; index += 1) {
+    if (wordLocalName(nodes[index]) === 'body') {
+      body = nodes[index];
+      break;
+    }
+  }
+  if (!body) throw new Error('每日 Word 的內容未能讀取。');
+  const html = document.implementation.createHTMLDocument('daily');
+  appendWordBlocks(body, html.body, html);
+  return html;
+}
+
 async function parseDailyWord(file, buffer) {
   const entries = readZipEntries(buffer);
-  const part = entries.find(entry => entry.name === 'word/afchunk.mht');
-  if (!part) throw new Error('這不是每日 Word 日報。請使用本程式匯出的每日 Word，不要匯入已彙整的總報告。');
-  const decoded = decodeQuotedPrintable(await inflateZip(part));
-  const start = decoded.search(/<html[\s>]/i);
-  const end = decoded.toLowerCase().indexOf('</html>');
-  if (start < 0 || end < 0) throw new Error('每日 Word 的內容未能讀取。');
-  const doc = new DOMParser().parseFromString(decoded.slice(start, end + 7), 'text/html');
+  const chunk = entries.find(entry => entry.name === 'word/afchunk.mht');
+  if (chunk) {
+    const decoded = decodeQuotedPrintable(await inflateZip(chunk));
+    const start = decoded.search(/<html[\s>]/i);
+    const end = decoded.toLowerCase().indexOf('</html>');
+    if (start < 0 || end < 0) throw new Error('每日 Word 的內容未能讀取。');
+    return parseDailyWordDocument(file, new DOMParser().parseFromString(decoded.slice(start, end + 7), 'text/html'));
+  }
+  const documentPart = entries.find(entry => entry.name === 'word/document.xml');
+  if (!documentPart) throw new Error('這不是每日 Word 日報。請使用本程式匯出的每日 Word，不要匯入已彙整的總報告。');
+  const xml = new TextDecoder('utf-8').decode(await inflateZip(documentPart));
+  return parseDailyWordDocument(file, wordXmlToHtmlDocument(xml));
+}
+
+function parseDailyWordDocument(file, doc) {
   const tables = Array.from(doc.querySelectorAll('table')).filter(table => !table.parentElement.closest('table'));
   if (tables.length < 4) throw new Error('每日 Word 的表格不完整。');
   const info = wordLabelMap(tables[0]);
   const date = (String(info['記錄日期'] || '').match(/\d{4}-\d{2}-\d{2}/) || [])[0] || '';
   if (!date) throw new Error('Word 日報沒有記錄日期。');
-  const night = Object.prototype.hasOwnProperty.call(info, '超時人數') || Object.prototype.hasOwnProperty.call(info, '超時工作時段');
+  const hasDaytimeHeadcount = Object.prototype.hasOwnProperty.call(info, '總開工人數');
+  const hasOtHeadcountLabel = Object.prototype.hasOwnProperty.call(info, '超時人數') || Object.prototype.hasOwnProperty.call(info, '總超時工作人數');
+  const night = hasOtHeadcountLabel || Object.prototype.hasOwnProperty.call(info, '超時工作時段');
+  const pureOtReport = night && !hasDaytimeHeadcount;
   const [warningStart, warningEnd] = wordRange(info['警告時段']);
   const [stopStart, stopEnd] = wordRange(info['停工時段']);
   const locations = wordRows(tables[1]).slice(1).filter(cells => cells[0] && !cells[0].includes('工作地點')).map(cells => {
     const lines = String(cells[2] || '').split('\n').map(line => line.trim()).filter(Boolean);
     const remark = lines.filter(line => line.startsWith('備註')).map(line => line.replace(/^備註[:：]\s*/, '')).join(' ');
     const trades = lines.filter(line => !line.startsWith('備註')).map(line => line.replace(/^\(OT\)\s*/, ''));
+    const markedOt = /\(OT\)/.test(cells[0] || '') || lines.some(line => line.startsWith('(OT)'));
     return {
       location: String(cells[0] || '').replace(/\s*\(OT\)\s*$/, '').trim(),
       workers: wordPeople(cells[1]),
-      ot: adminYesNo(/\(OT\)/.test(cells[0] || '') || lines.some(line => line.startsWith('(OT)'))),
+      ot: markedOt || pureOtReport ? '是' : '',
       categories: trades[0] || '',
       subCategories: trades[1] || '',
       remark
@@ -601,9 +723,9 @@ async function parseDailyWord(file, buffer) {
   const inspectionText = materialRows[1] ? materialRows[1][1] : '';
   const mosiMatch = String(inspectionText || '').match(/MOSI 驗收[:：]\s*([^\n]*)/);
   const otherMatch = String(inspectionText || '').match(/工序檢查[:：]\s*([^\n]*)/);
-  const bodyText = doc.body.innerText || '';
-  const injuryMatch = bodyText.match(/工傷事故[:：]\s*([^\n]+)/);
-  const obstacleMatch = bodyText.match(/進度受阻[:：]\s*([^\n]+)/);
+  const bodyText = wordBlockText(doc.body);
+  const injuryMatch = bodyText.match(/工傷事故[:：]\s*([\s\S]*?)(?=\n+\s*進度受阻[:：]|$)/);
+  const obstacleMatch = bodyText.match(/進度受阻[:：]\s*([\s\S]*?)(?=\n+\s*(?:[0-9]+\.\s*)?辦公室人員|$)/);
   const injuryText = injuryMatch ? injuryMatch[1].trim() : '';
   const obstacleText = obstacleMatch ? obstacleMatch[1].trim() : '';
   const periodTable = tables[0].querySelector('table');
@@ -621,14 +743,15 @@ async function parseDailyWord(file, buffer) {
     };
   }) : [];
   const staffTable = tables[4];
-  const staff = staffTable ? wordRows(staffTable).slice(1).filter(cells => cells[0] && cells[0] !== '職位' && !cells[0].includes('無')).map(cells => ({
+  const staff = staffTable ? wordRows(staffTable).slice(1).filter(cells => cells[0] && cells[0] !== '職位' && cells[0] !== '無').map(cells => ({
     role: cells[0],
     displayRole: cells[0],
-    name: cells[1] || ''
+    name: cells[1] || '',
+    workDetails: cells[2] || ''
   })) : [];
   const weatherItems = String(info['當日天氣/警告'] || '').split('、').map(item => item.trim()).filter(Boolean);
-  const totalHeadcount = wordPeople(info['總開工人數']);
-  const overtimeHeadcount = night ? wordPeople(info['超時人數']) : 0;
+  const totalHeadcount = wordPeople(info['總開工人數']) || wordPeople(info['總超時工作人數']);
+  const overtimeHeadcount = wordPeople(info['超時人數']) || wordPeople(info['總超時工作人數']);
   const summary = {
     date,
     contractNo: String(info['項目編號'] || '').trim(),
@@ -689,41 +812,57 @@ function readAdminUpload(file) {
   if (name.endsWith('.xlsx')) return file.arrayBuffer().then(buffer => parseDailyFile(file, buffer));
   if (name.endsWith('.json')) return file.text().then(text => parseDailyJson(file, text));
   if (name.endsWith('.doc')) return Promise.reject(new Error('請使用 .docx 每日報告。舊式 .doc 未能讀取。'));
-  return Promise.reject(new Error('請選擇每日 Word（.docx）或 Excel（.xlsx）。'));
+  return Promise.reject(new Error('請選擇每日 Word（.docx）、Excel（.xlsx）或專檔（.json）。'));
 }
 
 function promptImportKind() {
-  return new Promise(resolve => {
-    const existing = document.getElementById('adminImportModal');
-    if (existing) existing.remove();
-    const modal = document.createElement('div');
-    modal.id = 'adminImportModal';
-    modal.className = 'fixed inset-0 bg-slate-950/60 z-[90] flex items-center justify-center p-4';
-    modal.innerHTML = `
-      <div class="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-200">
-        <h3 class="text-lg font-bold text-slate-900 mb-1">匯入每日報告</h3>
-        <p class="text-sm text-slate-600 mb-4 leading-relaxed">選擇要匯入的格式。可一次選多份。</p>
-        <div class="flex flex-col gap-2">
-          <button type="button" data-kind="word" class="h-11 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-black">匯入 Word</button>
-          <button type="button" data-kind="excel" class="h-11 rounded-xl bg-green-700 hover:bg-green-800 text-white font-black">匯入 Excel</button>
-          <button type="button" data-kind="" class="h-11 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold">取消</button>
-        </div>
-      </div>
-    `;
-    let settled = false;
-    const finish = (kind) => {
-      if (settled) return;
-      settled = true;
-      modal.remove();
-      resolve(kind);
-    };
-    modal.addEventListener('click', (event) => {
-      const button = event.target.closest('[data-kind]');
-      if (button) finish(button.getAttribute('data-kind'));
-      else if (event.target === modal) finish('');
-    });
-    document.body.appendChild(modal);
+  const existing = document.getElementById('adminImportModal');
+  if (existing) {
+    if (typeof existing._abortImport === 'function') existing._abortImport();
+    existing.remove();
+  }
+  const wordInput = document.getElementById('adminWordInput');
+  const excelInput = document.getElementById('adminExcelInput');
+  const jsonInput = document.getElementById('adminJsonInput');
+  [wordInput, excelInput, jsonInput].forEach(input => {
+    if (input) input.value = '';
   });
+  const modal = document.createElement('div');
+  modal.id = 'adminImportModal';
+  modal.className = 'fixed inset-0 bg-slate-950/60 z-[90] flex items-center justify-center p-4';
+  modal.innerHTML = `
+    <div class="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-200" role="dialog" aria-modal="true" aria-labelledby="adminImportTitle">
+      <h3 id="adminImportTitle" class="text-lg font-bold text-slate-900 mb-1">匯入每日報告</h3>
+      <p class="text-sm text-slate-600 mb-4 leading-relaxed">選擇要匯入的格式。可一次選多份。</p>
+      <div class="flex flex-col gap-2">
+        <label for="adminWordInput" class="h-11 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-black flex items-center justify-center cursor-pointer">匯入 Word</label>
+        <label for="adminExcelInput" class="h-11 rounded-xl bg-green-700 hover:bg-green-800 text-white font-black flex items-center justify-center cursor-pointer">匯入 Excel</label>
+        <label for="adminJsonInput" class="h-11 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black flex items-center justify-center cursor-pointer">匯入專檔</label>
+        <button type="button" data-close="1" class="h-11 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold">取消</button>
+      </div>
+    </div>
+  `;
+  const controller = new AbortController();
+  modal._abortImport = () => controller.abort();
+  const close = () => {
+    if (!modal.isConnected) return;
+    controller.abort();
+    modal.remove();
+  };
+  modal.addEventListener('click', (event) => {
+    if (event.target.closest('[data-close]') || event.target === modal) close();
+  });
+  modal.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') close();
+  });
+  [wordInput, excelInput, jsonInput].forEach(input => {
+    if (!input) return;
+    input.addEventListener('change', close, { signal: controller.signal });
+    input.addEventListener('cancel', close, { signal: controller.signal });
+  });
+  document.body.appendChild(modal);
+  const cancel = modal.querySelector('[data-close]');
+  if (cancel) cancel.focus();
 }
 
 function otSignature(file) {
@@ -741,33 +880,67 @@ function sortAdminFiles(a, b) {
   return String(a.fileName).localeCompare(String(b.fileName), 'zh-HK');
 }
 
+function otPeriodTokens(file) {
+  return (file.periods || [])
+    .map(period => [String(period.start || '').trim(), String(period.end || '').trim(), String(adminNum(period.workers))].join('~'))
+    .filter(item => item !== '~~0');
+}
+
+function fileIsMixed(file) {
+  const stats = fileLocationStats(file);
+  return stats.daytime > 0 && (stats.ot > 0 || fileOtHours(file) > 0);
+}
+
+function fileDayKind(file) {
+  if (fileIsMixed(file)) return 'mixed';
+  if (fileOtPeople(file) > 0 || fileOtHours(file) > 0 || file.hasOt) return 'ot';
+  return 'day';
+}
+
 function mergeAdminFiles(existing, incoming) {
   const notes = [];
   const nonOt = new Map();
+  const mixed = new Map();
   const otGroups = new Map();
+  const keepNewer = (map, key, file, replacedNote) => {
+    const previous = map.get(key);
+    if (!previous || fileRecency(file) >= fileRecency(previous)) {
+      if (previous) notes.push(`${replacedNote}：${previous.fileName}`);
+      map.set(key, file);
+    } else {
+      notes.push(`${replacedNote}：${file.fileName}`);
+    }
+  };
   existing.concat(incoming).forEach(file => {
     const dayKey = `${file.date}|${file.contractNo || ''}`;
-    if (!file.hasOt) {
-      const previous = nonOt.get(dayKey);
-      if (!previous || fileRecency(file) >= fileRecency(previous)) {
-        if (previous) notes.push(`同日一般日報保留較新檔案，略過：${previous.fileName}`);
-        nonOt.set(dayKey, file);
-      } else {
-        notes.push(`同日一般日報保留較新檔案，略過：${file.fileName}`);
-      }
+    if (fileIsMixed(file)) {
+      keepNewer(mixed, dayKey, file, '同日日間＋OT 日報保留較新檔案，略過');
       return;
     }
-    const signature = `${dayKey}|${otSignature(file)}`;
-    const previous = otGroups.get(signature);
-    if (!previous || fileRecency(file) >= fileRecency(previous)) {
-      if (previous) notes.push(`相同 OT 時段保留較新檔案，略過：${previous.fileName}`);
-      otGroups.set(signature, file);
-    } else {
-      notes.push(`相同 OT 時段保留較新檔案，略過：${file.fileName}`);
+    if (!file.hasOt) {
+      keepNewer(nonOt, dayKey, file, '同日一般日報保留較新檔案，略過');
+      return;
     }
+    keepNewer(otGroups, `${dayKey}|${otSignature(file)}`, file, '相同 OT 時段保留較新檔案，略過');
+  });
+  mixed.forEach((file, dayKey) => {
+    if (nonOt.has(dayKey)) {
+      notes.push(`同日已有日間＋OT 日報，略過日間檔：${nonOt.get(dayKey).fileName}`);
+      nonOt.delete(dayKey);
+    }
+    const tokens = new Set(otPeriodTokens(file));
+    Array.from(otGroups.keys()).forEach(key => {
+      if (!key.startsWith(`${dayKey}|`)) return;
+      const otFile = otGroups.get(key);
+      const tokensOfFile = otPeriodTokens(otFile);
+      if (tokensOfFile.length && tokensOfFile.every(token => tokens.has(token))) {
+        notes.push(`相同 OT 時段已包含在日間＋OT 日報，略過：${otFile.fileName}`);
+        otGroups.delete(key);
+      }
+    });
   });
   return {
-    files: Array.from(nonOt.values()).concat(Array.from(otGroups.values())).sort(sortAdminFiles),
+    files: Array.from(nonOt.values()).concat(Array.from(mixed.values()), Array.from(otGroups.values())).sort(sortAdminFiles),
     notes
   };
 }
@@ -818,25 +991,48 @@ function formatEvent(event, lang) {
   if (event.kind === 'otSession' && event.period) {
     const period = event.period;
     const hours = adminNum(period.personHours) || adminRound1(adminNum(period.hours) * adminNum(period.workers));
-    return `${period.start || '—'}–${period.end || '—'} · ${adminNum(period.workers)} ${reportLabel(lang, 'people')} · ${adminRound1(hours)}`;
+    return `${period.start || '—'}–${period.end || '—'} · ${adminNum(period.workers)} ${reportLabel(lang, 'people')} · ${adminRound1(hours)} ${reportLabel(lang, 'hoursUnit')}`;
   }
   return event.text || '';
 }
 
-function summaryHasOtHeadcount(file) {
-  const value = file && file.summary ? file.summary.overtimeHeadcount : undefined;
-  return value !== undefined && value !== null && String(value).trim() !== '';
+function isPlaceholderLocation(location) {
+  const name = String(location && location.location || '').trim();
+  return !name || name === '當天無分佈明細' || name === '當日無分佈記錄' || name === '無分佈明細';
+}
+
+function isPlaceholderProgress(title) {
+  const name = String(title || '').trim();
+  return !name || name === '無施工進度記錄' || name === '當日無進度記錄';
+}
+
+function fileLocations(file) {
+  return (Array.isArray(file && file.locations) ? file.locations : []).filter(location => !isPlaceholderLocation(location));
+}
+
+function fileLocationStats(file) {
+  const locations = fileLocations(file);
+  const explicit = locations.filter(location => locationRowIsOt(location) !== null);
+  const flaggedOt = explicit.reduce((sum, location) => sum + (locationRowIsOt(location) ? adminNum(location.workers) : 0), 0);
+  const flaggedDay = locations.reduce((sum, location) => sum + (locationRowIsOt(location) === true ? 0 : adminNum(location.workers)), 0);
+  const summaryOt = adminNum(file && file.summary && file.summary.overtimeHeadcount);
+  const total = adminNum(file && file.summary && file.summary.totalHeadcount);
+  if (flaggedOt > 0) return { daytime: flaggedDay, ot: flaggedOt };
+  if (summaryOt > 0) {
+    const base = locations.length ? flaggedDay : total;
+    return { daytime: Math.max(0, base - summaryOt), ot: summaryOt };
+  }
+  if (file && file.hasOt && !explicit.length) return { daytime: 0, ot: total };
+  if (locations.length) return { daytime: flaggedDay, ot: 0 };
+  return { daytime: file && file.hasOt ? 0 : total, ot: 0 };
 }
 
 function fileOtPeople(file) {
-  if (summaryHasOtHeadcount(file)) return adminNum(file.summary.overtimeHeadcount);
-  return file.hasOt ? adminNum(file.summary && file.summary.totalHeadcount) : 0;
+  return fileLocationStats(file).ot;
 }
 
-function fileNormalPeople(file) {
-  if (!file.hasOt) return adminNum(file.summary && file.summary.totalHeadcount);
-  if (!summaryHasOtHeadcount(file)) return 0;
-  return Math.max(0, adminNum(file.summary.totalHeadcount) - adminNum(file.summary.overtimeHeadcount));
+function fileDaytimePeople(file) {
+  return fileLocationStats(file).daytime;
 }
 
 function locationRowIsOt(location) {
@@ -844,38 +1040,68 @@ function locationRowIsOt(location) {
   return adminIsYes(location.ot);
 }
 
+function dayHasOtContent(file) {
+  if (fileOtPeople(file) > 0 || fileOtHours(file) > 0) return true;
+  return (file.periods || []).some(period => String(period.start || '').trim() || String(period.end || '').trim() || adminNum(period.workers) > 0);
+}
+
+function fileHasExplicitOt(file) {
+  return fileLocations(file).some(location => locationRowIsOt(location) === true);
+}
+
+function locationCountsAsOt(location, file) {
+  const flagged = locationRowIsOt(location);
+  if (flagged !== null) return flagged;
+  return !fileHasExplicitOt(file) && !!file.hasOt;
+}
+
+function dayLocationRows(files) {
+  return files.flatMap(file => fileLocations(file).map(location => (
+    Object.assign({}, location, { ot: locationCountsAsOt(location, file) ? '是' : '否' })
+  )));
+}
+
+function dayProgressRows(files) {
+  const map = new Map();
+  files.slice().sort((a, b) => fileRecency(a) - fileRecency(b)).forEach(file => {
+    (file.progress || []).forEach(item => {
+      const title = String(item.title || '').trim();
+      if (isPlaceholderProgress(title)) return;
+      map.set(title, { title, percent: adminNum(item.percent) });
+    });
+  });
+  return Array.from(map.values());
+}
+
+function daySummaryFile(files) {
+  const ranked = files.slice().sort((a, b) => fileRecency(b) - fileRecency(a));
+  return ranked.find(file => file.summary && String(file.summary.weather || '').trim()) || ranked[0] || null;
+}
+
 function buildDayRecord(date, files) {
-  const daytimeFiles = files.filter(file => !file.hasOt).sort((a, b) => fileRecency(b) - fileRecency(a));
-  const otFiles = files.filter(file => file.hasOt);
-  const daytimeFile = daytimeFiles[0] || null;
-  const newestOt = otFiles.slice().sort((a, b) => fileRecency(b) - fileRecency(a))[0] || null;
-  const splitNormal = otFiles.reduce((sum, file) => sum + (summaryHasOtHeadcount(file) ? fileNormalPeople(file) : 0), 0);
-  const daytimeHeadcount = daytimeFile
-    ? adminNum(daytimeFile.summary.totalHeadcount)
-    : (splitNormal > 0 ? splitNormal : null);
-  const daytime = daytimeFile || (daytimeHeadcount != null ? newestOt : null);
-  const main = daytimeFile || newestOt;
+  const stats = files.map(file => fileLocationStats(file));
+  const newest = files.slice().sort((a, b) => fileRecency(b) - fileRecency(a))[0] || null;
+  const summaryFile = daySummaryFile(files);
   return {
     date,
     files,
-    daytime,
-    otFiles,
-    main,
-    daytimeHeadcount,
-    otHeadcount: otFiles.reduce((sum, file) => sum + fileOtPeople(file), 0),
-    otPersonHours: adminRound1(otFiles.reduce((sum, file) => sum + fileOtHours(file), 0)),
-    locations: main ? main.locations : [],
-    progress: main ? main.progress : [],
+    daytime: newest,
+    otFiles: files.filter(dayHasOtContent),
+    main: summaryFile || newest,
+    daytimeHeadcount: files.length ? stats.reduce((sum, item) => sum + item.daytime, 0) : null,
+    otHeadcount: stats.reduce((sum, item) => sum + item.ot, 0),
+    otPersonHours: adminRound1(files.reduce((sum, file) => sum + fileOtHours(file), 0)),
+    locations: dayLocationRows(files),
+    progress: dayProgressRows(files),
     events: files.flatMap(collectEvents),
-    summary: main ? main.summary : null
+    summary: summaryFile && summaryFile.summary ? summaryFile.summary : null
   };
 }
 
 function accumulateCategories(files, target) {
   files.forEach(file => {
     (file.locations || []).forEach(location => {
-      const flagged = locationRowIsOt(location);
-      const rowIsOt = flagged === null ? !!file.hasOt : flagged;
+      const rowIsOt = locationCountsAsOt(location, file);
       const workers = adminNum(location.workers);
       const names = splitAdminList(location.categories);
       (names.length ? names : ['未分類']).forEach(name => {
@@ -895,7 +1121,7 @@ function progressMovement(days) {
   days.forEach(day => {
     (day.progress || []).forEach(item => {
       const title = String(item.title || '').trim();
-      if (!title) return;
+      if (isPlaceholderProgress(title)) return;
       if (!map.has(title)) map.set(title, []);
       map.get(title).push({ date: day.date, percent: adminNum(item.percent) });
     });
@@ -915,20 +1141,25 @@ function progressMovement(days) {
 }
 
 function uniqueStaff(files) {
-  const seen = new Set();
-  const list = [];
+  const map = new Map();
   files.forEach(file => {
     (file.staff || []).forEach(item => {
       const role = String(item.displayRole || item.role || '').trim();
       const name = String(item.name || '').trim();
-      if (!role && !name) return;
+      if ((!role && !name) || role === '無' || name === '無') return;
       const key = `${role}|${name}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      list.push({ role, name });
+      if (!map.has(key)) map.set(key, { role, name, details: [] });
+      const work = [item.start && item.end ? `${item.start}–${item.end}` : (item.start || item.end || ''), item.workDetails || item.workCategories || '', item.remarks || ''].filter(Boolean).join(' ');
+      const line = [file.date, work].filter(Boolean).join(' ');
+      const entry = map.get(key);
+      if (line && !entry.details.includes(line)) entry.details.push(line);
     });
   });
-  return list;
+  return Array.from(map.values()).map(item => ({
+    role: item.role,
+    name: item.name,
+    detail: item.details.join('\n')
+  }));
 }
 
 function analyzeContract(files, period) {
@@ -939,8 +1170,9 @@ function analyzeContract(files, period) {
     byDate.get(file.date).push(file);
   });
   const days = dates.map(date => buildDayRecord(date, byDate.get(date) || []));
-  const daytimeDays = days.filter(day => day.daytime);
-  const totalDaytime = daytimeDays.reduce((sum, day) => sum + day.daytimeHeadcount, 0);
+  const reported = days.filter(day => day.files.length);
+  const daytimeDays = reported.filter(day => adminNum(day.daytimeHeadcount) > 0);
+  const totalDaytime = reported.reduce((sum, day) => sum + adminNum(day.daytimeHeadcount), 0);
   const peak = daytimeDays.reduce((best, day) => day.daytimeHeadcount > best.value ? { value: day.daytimeHeadcount, date: day.date } : best, { value: 0, date: '' });
   const categories = new Map();
   accumulateCategories(files, categories);
@@ -956,7 +1188,7 @@ function analyzeContract(files, period) {
     peak,
     otPeople: days.reduce((sum, day) => sum + day.otHeadcount, 0),
     otHours: adminRound1(days.reduce((sum, day) => sum + day.otPersonHours, 0)),
-    otDays: days.filter(day => day.otFiles.length).length,
+    otDays: days.filter(day => day.otHeadcount > 0 || day.otPersonHours > 0).length,
     reportedDays: days.filter(day => day.files.length).length,
     missing: days.filter(day => !day.files.length).map(day => day.date),
     categories: Array.from(categories.values()).sort((a, b) => (b.daytimeWorkers + b.otWorkers) - (a.daytimeWorkers + a.otWorkers)),
@@ -1018,6 +1250,12 @@ function narrativeFor(contract, period, lang) {
       : `超時工作共 ${contract.otDays} 日，OT 人數合計 ${contract.otPeople}，OT 人時數 ${contract.otHours}。`
   ];
   contract.progress.slice(0, 3).forEach(item => {
+    if (item.startDate === item.endDate) {
+      sentences.push(lang === 'en'
+        ? `${item.title}: ${formatAdminPercent(item.end)}% on ${item.endDate}.`
+        : `${item.title}：${formatAdminPercent(item.end)}%（${item.endDate}）。`);
+      return;
+    }
     const sign = item.change > 0 ? '+' : '';
     sentences.push(lang === 'en'
       ? `${item.title}: ${item.start}% ${t('to')} ${item.end}% (${sign}${item.change} ${t('point')}).`
@@ -1081,8 +1319,15 @@ function drawGroupedBarChart(title, labels, seriesList) {
       const barHeight = (value / max) * plot.h;
       const x = plot.x + index * groupWidth + 10 + seriesIndex * barWidth;
       const y = plot.y + plot.h - barHeight;
+      const barW = Math.max(4, barWidth - 4);
       ctx.fillStyle = series.color;
-      ctx.fillRect(x, y, Math.max(4, barWidth - 4), barHeight);
+      ctx.fillRect(x, y, barW, barHeight);
+      if (value > 0) {
+        ctx.fillStyle = '#1e293b';
+        ctx.font = `14px ${REPORT_FONT}, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(String(adminRound1(value)), x + barW / 2, Math.max(plot.y + 16, y - 6));
+      }
     });
     ctx.save();
     ctx.translate(plot.x + index * groupWidth + groupWidth / 2, plot.y + plot.h + 18);
@@ -1185,17 +1430,19 @@ function docxParagraph(text, options = {}) {
 
 function docxCell(text, width, options = {}) {
   const fill = options.fill || '';
+  const lines = String(text == null ? '' : text).split(/\n/);
+  const runOptions = {
+    bold: options.bold,
+    size: options.size || 18,
+    color: options.color || (fill === '1B3A4B' ? 'FFFFFF' : '1E293B')
+  };
   return new docx.TableCell({
     width: { size: width, type: docx.WidthType.DXA },
     shading: fill ? { fill } : undefined,
     margins: { top: 50, bottom: 50, left: 70, right: 70 },
-    children: [new docx.Paragraph({
-      children: [docxRun(text, {
-        bold: options.bold,
-        size: options.size || 18,
-        color: options.color || (fill === '1B3A4B' ? 'FFFFFF' : '1E293B')
-      })]
-    })]
+    children: (lines.length ? lines : ['']).map(line => new docx.Paragraph({
+      children: [docxRun(line, runOptions)]
+    }))
   });
 }
 
@@ -1276,8 +1523,8 @@ function buildWordSection(model, contract, charts) {
         day.date,
         weekdayName(day.date, lang),
         day.daytimeHeadcount == null ? (day.files.length ? '—' : t('noReport')) : String(day.daytimeHeadcount),
-        day.otFiles.length ? String(day.otHeadcount) : '—',
-        day.otFiles.length ? String(day.otPersonHours) : '—',
+        day.files.length ? String(day.otHeadcount) : '—',
+        day.files.length ? String(day.otPersonHours) : '—',
         (day.summary && day.summary.weather) || '—'
       ].map((value, cellIndex) => docxCell(value, dayWidths[cellIndex], { fill }))
     }));
@@ -1329,13 +1576,13 @@ function buildWordSection(model, contract, charts) {
   children.push(docxTable(eventWidths, eventRows));
 
   children.push(docxParagraph(t('staff'), { bold: true, size: 28, color: '1B3A4B', before: 300, after: 80 }));
-  const staffWidths = [5040, 5040];
-  const staffRows = [docxHeaderRow([t('role'), t('name')], staffWidths)];
-  (contract.staff.length ? contract.staff : [{ role: t('none'), name: '' }]).forEach((item, index) => {
+  const staffWidths = [2800, 2200, 5080];
+  const staffRows = [docxHeaderRow([t('role'), t('name'), t('staffWork')], staffWidths)];
+  (contract.staff.length ? contract.staff : [{ role: t('none'), name: '', detail: '' }]).forEach((item, index) => {
     const fill = index % 2 ? 'F8FAFC' : 'FFFFFF';
     staffRows.push(new docx.TableRow({
       cantSplit: true,
-      children: [item.role, item.name].map((value, cellIndex) => docxCell(value, staffWidths[cellIndex], { fill }))
+      children: [item.role, item.name, item.detail || ''].map((value, cellIndex) => docxCell(value, staffWidths[cellIndex], { fill }))
     }));
   });
   children.push(docxTable(staffWidths, staffRows));
@@ -1343,7 +1590,9 @@ function buildWordSection(model, contract, charts) {
   children.push(docxParagraph(t('daily'), { bold: true, size: 28, color: '1B3A4B', before: 320, after: 80 }));
   contract.days.forEach(day => {
     const head = day.daytimeHeadcount == null ? '—' : String(day.daytimeHeadcount);
-    children.push(docxParagraph(`${day.date} ${weekdayName(day.date, lang)}    ${t('headcount')} ${head}    ${t('otHead')} ${day.otFiles.length ? day.otHeadcount : '—'}`, {
+    const otHead = day.files.length ? `${day.otHeadcount} ${t('people')}` : '—';
+    const otHours = day.files.length ? `${day.otPersonHours} ${t('hoursUnit')}` : '—';
+    children.push(docxParagraph(`${day.date} ${weekdayName(day.date, lang)}    ${t('headcount')} ${head}    ${t('otHead')} ${otHead}    ${t('otHours')} ${otHours}`, {
       bold: true,
       size: 22,
       color: '1B3A4B',
@@ -1377,7 +1626,8 @@ function buildWordSection(model, contract, charts) {
     }
     day.otFiles.forEach(file => {
       const sessions = (file.periods || []).map(period => formatEvent({ kind: 'otSession', period }, lang)).filter(Boolean).join(lang === 'en' ? '; ' : '；');
-      children.push(docxParagraph(`OT · ${file.fileName} · ${fileOtPeople(file)} ${t('people')}${sessions ? ` · ${sessions}` : ''}`, { size: 18, before: 40 }));
+      const hours = adminRound1(fileOtHours(file));
+      children.push(docxParagraph(`OT · ${file.fileName} · ${fileOtPeople(file)} ${t('people')} · ${hours} ${t('hoursUnit')}${sessions ? ` · ${sessions}` : ''}`, { size: 18, before: 40 }));
     });
   });
 
@@ -1585,7 +1835,9 @@ function localizeNode(value, key) {
   if (typeof value === 'string') {
     if (['name', 'contractNo', 'id', 'kind', 'source', 'lang', 'type', 'anchor', 'date', 'startDate', 'endDate'].includes(key)) return value;
     if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value;
-    return toEnglish(value);
+    const translated = toEnglish(value);
+    if (['injuryDetails', 'obstacleDetails', 'materialDetails', 'remark', 'remarks', 'otherInspectionDetails', 'text', 'detail'].includes(key) && /[\u4e00-\u9fff]/.test(translated)) return value;
+    return translated;
   }
   if (Array.isArray(value)) return value.map(item => localizeNode(item, key));
   if (value && typeof value === 'object') {
@@ -1709,8 +1961,8 @@ async function exportAdminExcel(model) {
       day.date,
       weekdayName(day.date, lang),
       day.daytimeHeadcount == null ? '' : day.daytimeHeadcount,
-      day.otFiles.length ? day.otHeadcount : '',
-      day.otFiles.length ? day.otPersonHours : '',
+      day.files.length ? day.otHeadcount : '',
+      day.files.length ? day.otPersonHours : '',
       (day.summary && day.summary.weather) || '',
       day.files.map(file => file.fileName).join(lang === 'en' ? '; ' : '；')
     ]));
@@ -1743,17 +1995,23 @@ async function exportAdminExcel(model) {
         return;
       }
       day.files.forEach(file => {
-        const locations = (file.locations || []).map(item => {
+        const locations = dayLocationRows([file]).map(item => {
           const mark = locationRowIsOt(item) === true ? '(OT) ' : '';
-          return `${mark}${item.location || ''} ${adminNum(item.workers)}${reportLabel(lang, 'people')} ${mark}${item.categories || ''} ${item.subCategories || ''} ${item.remark || ''}`;
+          return `${mark}${item.location || ''} ${adminNum(item.workers)} ${reportLabel(lang, 'people')} ${mark}${item.categories || ''} ${item.subCategories || ''} ${item.remark || ''}`.trim();
         }).join('\n');
-        const progressText = (file.progress || []).map(item => `${item.title} ${formatAdminPercent(item.percent)}%`).join('\n');
+        const progressText = (file.progress || []).filter(item => !isPlaceholderProgress(item.title)).map(item => `${item.title} ${formatAdminPercent(item.percent)}%`).join('\n');
         const eventText = collectEvents(file).map(event => `${t(event.kind)}：${formatEvent(event, lang)}`).join('\n');
+        const stats = fileLocationStats(file);
+        const otHours = adminRound1(fileOtHours(file));
+        const kind = stats.ot > 0 && stats.daytime > 0 ? t('mixed') : ((stats.ot > 0 || otHours > 0) ? t('ot') : t('daytime'));
+        const headcountText = stats.ot > 0 || otHours > 0
+          ? `${stats.daytime} / OT ${stats.ot} / ${otHours} ${t('hoursUnit')}`
+          : String(stats.daytime);
         dailyRows.push([
           day.date,
-          file.hasOt ? t('ot') : t('daytime'),
+          kind,
           file.fileName,
-          summaryHasOtHeadcount(file) ? `${adminNum(file.summary.totalHeadcount)} / OT ${fileOtPeople(file)}` : adminNum(file.summary.totalHeadcount),
+          headcountText,
           locations,
           progressText,
           eventText,
@@ -1765,6 +2023,10 @@ async function exportAdminExcel(model) {
     daily.getColumn(5).width = 48;
     daily.getColumn(6).width = 36;
     daily.getColumn(7).width = 48;
+
+    const staffSheet = workbook.addWorksheet(`${t('staff')}${suffix}`.slice(0, 31));
+    const staffSource = contract.staff.length ? contract.staff : [{ role: t('none'), name: '', detail: '' }];
+    writeExcelTable(staffSheet, [t('role'), t('name'), t('staffWork')], staffSource.map(item => [item.role, item.name, item.detail || '']));
 
     const chartSheet = workbook.addWorksheet(`${t('charts')}${suffix}`.slice(0, 31));
     chartSheet.addRow([t('chartPeople')]);
@@ -1845,11 +2107,11 @@ function refreshAdminView() {
     <li class="border border-slate-200 rounded-xl p-3 flex items-start justify-between gap-3">
       <div class="min-w-0">
         <p class="font-bold text-sm text-slate-900 break-all">${escapeHtml(file.fileName)}</p>
-        <p class="text-xs text-slate-500 mt-1">${escapeHtml(file.date)} · ${escapeHtml(file.contractNo || '未填項目編號')} · ${file.source === 'word' ? 'Word' : (file.source === 'json' ? '專檔' : 'Excel')} ${file.hasOt ? '<span class="admin-ot">OT</span>' : '<span class="text-slate-400">日間</span>'}</p>
+        <p class="text-xs text-slate-500 mt-1">${escapeHtml(file.date)} · ${escapeHtml(file.contractNo || '未填項目編號')} · ${file.source === 'word' ? 'Word' : (file.source === 'json' ? '專檔' : 'Excel')} ${fileDayKind(file) === 'mixed' ? '<span class="admin-ot">日間＋OT</span>' : (fileDayKind(file) === 'ot' ? '<span class="admin-ot">OT</span>' : '<span class="text-slate-400">日間</span>')}</p>
       </div>
       <button type="button" data-action="remove" data-id="${escapeHtml(file.id)}" class="shrink-0 h-8 px-2 rounded-lg text-xs font-bold text-rose-700 bg-rose-50">移除</button>
     </li>
-  `).join('') : '<li class="text-sm text-slate-500">尚未匯入檔案。按「新增日報」後可選擇 Word 或 Excel，並一次選擇多份。</li>';
+  `).join('') : '<li class="text-sm text-slate-500">尚未匯入檔案。按「新增日報」後可選擇 Word、Excel 或專檔，並一次選擇多份。</li>';
   renderAdminCalendar(period);
 }
 
@@ -1948,15 +2210,7 @@ function onAdminClick(event) {
   if (!actionEl) return;
   const action = actionEl.getAttribute('data-action');
   if (action === 'add') {
-    const input = document.getElementById('adminExcelInput');
-    if (!input) return;
-    promptImportKind().then(kind => {
-      if (!kind) return;
-      input.accept = kind === 'word'
-        ? '.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        : '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-      input.click();
-    });
+    promptImportKind();
   } else if (action === 'remove') {
     const id = actionEl.getAttribute('data-id');
     adminState.files = adminState.files.filter(file => file.id !== id);
@@ -2078,12 +2332,14 @@ function applyAppMode(mode) {
 function bootAdmin() {
   restoreAdminFiles();
   const root = document.getElementById('adminWorkspace');
-  const input = document.getElementById('adminExcelInput');
   if (root) {
     root.addEventListener('click', onAdminClick);
     root.addEventListener('change', onAdminChange);
   }
-  if (input) input.addEventListener('change', importAdminExcelFiles);
+  ['adminWordInput', 'adminExcelInput', 'adminJsonInput'].forEach(id => {
+    const input = document.getElementById(id);
+    if (input) input.addEventListener('change', importAdminExcelFiles);
+  });
   refreshAdminView();
 }
 

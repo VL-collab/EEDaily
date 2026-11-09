@@ -369,18 +369,12 @@
               </label>
             </div>
             <div id="mosiDetailBox" class="hidden pt-3 border-t border-slate-200 mt-2 space-y-2">
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <div class="sm:col-span-2">
-                  <input type="text" id="mosiItem" placeholder="驗收物料名稱及編號" class="w-full h-11 px-3 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none">
-                </div>
-                <div>
-                  <select id="mosiResult" class="w-full h-11 px-3 bg-white border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none">
-                    <option value="合格 (Passed / Approved)">✅ 合格 (Passed)</option>
-                    <option value="附條件通過 (Approved with Comments)">⚠️ 附條件通過 (Comments)</option>
-                    <option value="不合格 / 拒收 (Rejected)">❌ 拒收 (Rejected)</option>
-                  </select>
-                </div>
-              </div>
+              <div id="mosiItemList" class="space-y-2"></div>
+              <button type="button" onclick="addMosiRow()"
+                      class="no-print bg-slate-800 hover:bg-slate-700 active:scale-95 text-white text-xs font-bold px-3 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm">
+                <i data-lucide="plus" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span>新增物料到場驗收</span>
+              </button>
             </div>
           </div>
 
@@ -395,9 +389,13 @@
                 <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
               </label>
             </div>
-            <div id="otherInspectionBox" class="hidden pt-3 border-t border-slate-200 mt-2">
-              <input type="text" id="otherInspectionDetail" placeholder="說明工序，如：3/F 樓面暗喉隱蔽驗收、中電 (CLP) 上錶前檢查"
-                     class="w-full h-11 px-3 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none">
+            <div id="otherInspectionBox" class="hidden pt-3 border-t border-slate-200 mt-2 space-y-2">
+              <div id="otherInspectionList" class="space-y-2"></div>
+              <button type="button" onclick="addOtherInspectionRow()"
+                      class="no-print bg-slate-800 hover:bg-slate-700 active:scale-95 text-white text-xs font-bold px-3 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm">
+                <i data-lucide="plus" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span>新增工序檢驗</span>
+              </button>
             </div>
           </div>
         </div>
@@ -2262,12 +2260,193 @@
       document.getElementById('materialToggleLabel').className = checked ? 'ml-2 text-xs font-bold text-amber-600' : 'ml-2 text-xs font-bold text-slate-600';
     }
 
+    const INSPECTION_STATUS_DEFAULT = '合格 (Passed / Approved)';
+    const INSPECTION_STATUSES = [
+      { value: '合格 (Passed / Approved)', label: '✅ 合格 (Passed)' },
+      { value: '附條件通過 (Approved with Comments)', label: '⚠️ COMMENT' },
+      { value: '不合格 / 拒收 (Rejected)', label: '❌ REJECT' },
+      { value: '未申報 (Not Submitted)', label: '📝 未申報' }
+    ];
+    let mosiRowCounter = 0;
+    let otherInspectionRowCounter = 0;
+
+    function inspectionStatusOptionsHtml(selected) {
+      const current = selected || INSPECTION_STATUS_DEFAULT;
+      const known = INSPECTION_STATUSES.some(option => option.value === current);
+      const extra = known ? '' : `<option value="${escapeHtml(current)}" selected>${escapeHtml(current)}</option>`;
+      return extra + INSPECTION_STATUSES.map(option =>
+        `<option value="${escapeHtml(option.value)}"${option.value === current ? ' selected' : ''}>${option.label}</option>`
+      ).join('');
+    }
+
+    function addInspectionRow(kind, prefill) {
+      const isMosi = kind === 'mosi';
+      const list = document.getElementById(isMosi ? 'mosiItemList' : 'otherInspectionList');
+      if (!list) return;
+      const rowId = isMosi ? `mosi-row-${++mosiRowCounter}` : `other-inspection-row-${++otherInspectionRowCounter}`;
+      const item = prefill && prefill.item ? prefill.item : '';
+      const result = prefill && prefill.result ? prefill.result : INSPECTION_STATUS_DEFAULT;
+      const placeholder = isMosi
+        ? '驗收物料名稱及編號'
+        : '說明工序，如：3/F 樓面暗喉隱蔽驗收、中電 (CLP) 上錶前檢查';
+      const row = document.createElement('div');
+      row.id = rowId;
+      row.className = `${isMosi ? 'mosi-item-row' : 'other-inspection-row'} grid grid-cols-1 sm:grid-cols-12 gap-2 items-center`;
+      row.innerHTML = `
+        <div class="sm:col-span-7">
+          <input type="text" class="inspection-item w-full h-11 px-3 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none" placeholder="${placeholder}" value="${escapeHtml(item)}">
+        </div>
+        <div class="sm:col-span-4">
+          <select class="inspection-result w-full h-11 px-2 bg-white border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none">
+            ${inspectionStatusOptionsHtml(result)}
+          </select>
+        </div>
+        <div class="sm:col-span-1 flex sm:justify-end">
+          <button type="button" onclick="deleteInspectionRow('${rowId}')" title="刪除此項"
+                  class="w-11 h-11 sm:w-9 sm:h-9 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-500 flex items-center justify-center transition border border-rose-200 active:scale-95 shadow-sm">
+            <i data-lucide="trash" class="w-4 h-4"></i>
+          </button>
+        </div>
+      `;
+      list.appendChild(row);
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function addMosiRow(prefill) {
+      addInspectionRow('mosi', prefill);
+    }
+
+    function addOtherInspectionRow(prefill) {
+      addInspectionRow('other', prefill);
+    }
+
+    function deleteInspectionRow(rowId) {
+      const row = document.getElementById(rowId);
+      if (!row) return;
+      row.remove();
+      scheduleDraftSave();
+    }
+
+    function setInspectionRows(kind, rows) {
+      const list = document.getElementById(kind === 'mosi' ? 'mosiItemList' : 'otherInspectionList');
+      if (!list) return;
+      list.innerHTML = '';
+      const source = Array.isArray(rows) && rows.length ? rows : [{ item: '', result: INSPECTION_STATUS_DEFAULT }];
+      source.forEach(row => addInspectionRow(kind, row));
+    }
+
+    function collectInspectionRows(selector) {
+      return Array.from(document.querySelectorAll(selector)).map(row => ({
+        item: (row.querySelector('.inspection-item').value || '').trim(),
+        result: row.querySelector('.inspection-result').value
+      })).filter(row => row.item);
+    }
+
+    function storedInspectionRows(record, kind) {
+      if (!record) return [];
+      if (Array.isArray(record.items) && record.items.length) {
+        return record.items.map(row => ({
+          item: (row && row.item) || '',
+          result: (row && row.result) || INSPECTION_STATUS_DEFAULT
+        }));
+      }
+      if (kind === 'mosi' && String(record.item || '').trim()) {
+        return [{ item: record.item, result: record.result || INSPECTION_STATUS_DEFAULT }];
+      }
+      if (kind === 'other' && String(record.details || '').trim()) {
+        return [{ item: record.details, result: INSPECTION_STATUS_DEFAULT }];
+      }
+      return [];
+    }
+
+    function inspectionRowsOf(record, kind) {
+      if (!record) return [];
+      const enabled = kind === 'mosi' ? record.hasMosi : record.hasOther;
+      if (!enabled) return [];
+      if (Array.isArray(record.items)) {
+        return record.items
+          .filter(row => row && String(row.item || '').trim())
+          .map(row => ({ item: String(row.item).trim(), result: String(row.result || '').trim() }));
+      }
+      if (kind === 'mosi') {
+        const item = String(record.item || '').trim();
+        const result = String(record.result || '').trim();
+        return item || result ? [{ item, result }] : [];
+      }
+      const details = String(record.details || '').trim();
+      return details ? [{ item: details, result: '' }] : [];
+    }
+
+    function inspectionSummary(rows) {
+      const filled = Array.isArray(rows) ? rows.filter(row => row && String(row.item || '').trim()) : [];
+      if (filled.length === 1) {
+        const row = filled[0];
+        return {
+          item: row.item,
+          result: row.result || '',
+          details: row.result ? `${row.item} [${row.result}]` : row.item
+        };
+      }
+      const paired = filled.map(row => row.result ? `${row.item} [${row.result}]` : row.item).join('；');
+      return { item: paired, result: '', details: paired };
+    }
+
+    function collectInspections() {
+      const hasMosi = document.getElementById('hasMOSI').checked;
+      const hasOther = document.getElementById('hasOtherInspection').checked;
+      const mosiItems = hasMosi ? collectInspectionRows('#mosiItemList .mosi-item-row') : [];
+      const otherItems = hasOther ? collectInspectionRows('#otherInspectionList .other-inspection-row') : [];
+      const mosiSummary = inspectionSummary(mosiItems);
+      const otherSummary = inspectionSummary(otherItems);
+      return {
+        mosi: {
+          hasMosi,
+          items: mosiItems,
+          item: mosiSummary.item,
+          result: mosiSummary.result
+        },
+        other: {
+          hasOther,
+          items: otherItems,
+          details: otherSummary.details
+        }
+      };
+    }
+
+    function inspectionPlain(record, kind) {
+      const rows = inspectionRowsOf(record, kind);
+      if (!rows.length) return '無';
+      return rows.map(row => row.result ? `${row.item} [${row.result}]` : row.item).join('；');
+    }
+
+    function inspectionPreviewHtml(record, kind) {
+      const rows = inspectionRowsOf(record, kind);
+      if (!rows.length) return '無';
+      return rows.map(row => {
+        const item = escapeHtml(row.item);
+        return row.result
+          ? `${item} <span class="font-semibold text-amber-700">[${escapeHtml(row.result)}]</span>`
+          : item;
+      }).join('<br>');
+    }
+
+    function inspectionExportHtml(record, kind) {
+      const rows = inspectionRowsOf(record, kind);
+      if (!rows.length) return '無';
+      return rows.map(row => {
+        const item = escapeHtml(row.item);
+        return row.result ? `${item} [${escapeHtml(row.result)}]` : item;
+      }).join('<br>');
+    }
+
     function toggleMosiSection(checked) {
       document.getElementById('mosiDetailBox').classList.toggle('hidden', !checked);
+      if (checked && !document.querySelector('#mosiItemList .mosi-item-row')) addMosiRow();
     }
 
     function toggleOtherInspection(checked) {
       document.getElementById('otherInspectionBox').classList.toggle('hidden', !checked);
+      if (checked && !document.querySelector('#otherInspectionList .other-inspection-row')) addOtherInspectionRow();
     }
 
     function toggleInjuryBox(checked) {
@@ -3041,17 +3220,7 @@
           hasArrival: document.getElementById('hasMaterialArrival').checked,
           details: document.getElementById('materialInput').value.trim()
         },
-        inspections: {
-          mosi: {
-            hasMosi: document.getElementById('hasMOSI').checked,
-            item: document.getElementById('mosiItem').value.trim(),
-            result: document.getElementById('mosiResult').value
-          },
-          other: {
-            hasOther: document.getElementById('hasOtherInspection').checked,
-            details: document.getElementById('otherInspectionDetail').value.trim()
-          }
-        },
+        inspections: collectInspections(),
         safety: {
           injury: {
             hasInjury: document.getElementById('hasInjury').checked,
@@ -3224,10 +3393,10 @@
             <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
               <span class="font-semibold text-slate-800 block mb-1">MOSI 及工序檢驗：</span>
               <p class="text-slate-600 mb-1">
-                <strong>MOSI 驗收：</strong> ${data.inspections.mosi.hasMosi ? `${data.inspections.mosi.item} <span class="font-semibold text-amber-700">[${data.inspections.mosi.result}]</span>` : '無'}
+                <strong>MOSI 驗收：</strong> ${inspectionPreviewHtml(data.inspections && data.inspections.mosi, 'mosi')}
               </p>
               <p class="text-slate-600">
-                <strong>其他檢查：</strong> ${data.inspections.other.hasOther ? data.inspections.other.details : '無'}
+                <strong>工序檢驗：</strong> ${inspectionPreviewHtml(data.inspections && data.inspections.other, 'other')}
               </p>
             </div>
           </div>
@@ -3432,8 +3601,8 @@
               <tr>
                 <td>${d.materialDelivery && d.materialDelivery.hasArrival ? escapeHtml(d.materialDelivery.details) : '當天無物料運抵地盤'}</td>
                 <td>
-                  MOSI 驗收：${d.inspections && d.inspections.mosi && d.inspections.mosi.hasMosi ? `${escapeHtml(d.inspections.mosi.item)} [${escapeHtml(d.inspections.mosi.result)}]` : '無'}<br>
-                  工序檢查：${d.inspections && d.inspections.other && d.inspections.other.hasOther ? escapeHtml(d.inspections.other.details) : '無'}
+                  MOSI 驗收：${inspectionExportHtml(d.inspections && d.inspections.mosi, 'mosi')}<br>
+                  工序檢查：${inspectionExportHtml(d.inspections && d.inspections.other, 'other')}
                 </td>
               </tr>
             </table>
@@ -3996,8 +4165,8 @@
       children.push(dailyDocxTable(progressWidths, progressRows));
 
       children.push(dailyDocxHeading('3. 物料點收與地盤檢驗 (Site Inspections)'));
-      const mosiText = mosi.hasMosi ? `${mosi.item || ''} [${mosi.result || ''}]`.trim() : '無';
-      const otherText = otherInspection.hasOther ? (otherInspection.details || '') : '無';
+      const mosiText = inspectionPlain(mosi, 'mosi');
+      const otherText = inspectionPlain(otherInspection, 'other');
       const inspectionLines = [
         dailyDocxParagraph([dailyDocxRun('MOSI 驗收：', { bold: true }), dailyDocxRun(mosiText)]),
         dailyDocxParagraph([dailyDocxRun('工序檢查：', { bold: true }), dailyDocxRun(otherText)], { before: 60 })
@@ -4315,12 +4484,8 @@
       const materialText = data.materialDelivery && data.materialDelivery.hasArrival
         ? (data.materialDelivery.details || '有，未填明細')
         : '當天無物料運抵地盤';
-      const mosiText = data.inspections && data.inspections.mosi && data.inspections.mosi.hasMosi
-        ? `${data.inspections.mosi.item || ''} [${data.inspections.mosi.result || ''}]`.trim()
-        : '無';
-      const otherText = data.inspections && data.inspections.other && data.inspections.other.hasOther
-        ? (data.inspections.other.details || '有')
-        : '無';
+      const mosiText = inspectionPlain(data.inspections && data.inspections.mosi, 'mosi');
+      const otherText = inspectionPlain(data.inspections && data.inspections.other, 'other');
       spanValue('物料運抵', materialText);
       spanValue('MOSI 驗收', mosiText);
       spanValue('其他檢查', otherText);
@@ -4786,8 +4951,8 @@
         progressText.trimEnd(),
         "",
         `📦 物料到場：${d.materialDelivery.hasArrival ? d.materialDelivery.details : '無'}`,
-        `📋 MOSI 驗收：${d.inspections.mosi.hasMosi ? `${d.inspections.mosi.item} (${d.inspections.mosi.result})` : '無'}`,
-        `🔍 工序檢查：${d.inspections.other.hasOther ? d.inspections.other.details : '無'}`,
+        `📋 MOSI 驗收：${inspectionPlain(d.inspections && d.inspections.mosi, 'mosi')}`,
+        `🔍 工序檢查：${inspectionPlain(d.inspections && d.inspections.other, 'other')}`,
         `⛑️ 安全工傷：${d.safety.injury.hasInjury ? `⚠️ ${d.safety.injury.details}` : '零意外 (Nil)'}`,
         `⚠️ 特殊阻礙：${d.safety.obstacles.hasObstacle ? d.safety.obstacles.details : '無'}`,
         "",
@@ -4926,20 +5091,17 @@
       toggleMaterialSection(hasMat);
       document.getElementById('materialInput').value = (data.materialDelivery && data.materialDelivery.details) || '';
 
-      const hasMosi = !!(data.inspections && data.inspections.mosi && data.inspections.mosi.hasMosi);
+      const mosiRecord = data.inspections && data.inspections.mosi;
+      const hasMosi = !!(mosiRecord && mosiRecord.hasMosi);
       document.getElementById('hasMOSI').checked = hasMosi;
+      setInspectionRows('mosi', hasMosi ? storedInspectionRows(mosiRecord, 'mosi') : []);
       toggleMosiSection(hasMosi);
-      if (hasMosi) {
-        document.getElementById('mosiItem').value = data.inspections.mosi.item || '';
-        document.getElementById('mosiResult').value = data.inspections.mosi.result || '合格 (Passed / Approved)';
-      }
 
-      const hasOther = !!(data.inspections && data.inspections.other && data.inspections.other.hasOther);
+      const otherRecord = data.inspections && data.inspections.other;
+      const hasOther = !!(otherRecord && otherRecord.hasOther);
       document.getElementById('hasOtherInspection').checked = hasOther;
+      setInspectionRows('other', hasOther ? storedInspectionRows(otherRecord, 'other') : []);
       toggleOtherInspection(hasOther);
-      if (hasOther) {
-        document.getElementById('otherInspectionDetail').value = data.inspections.other.details || '';
-      }
 
       const hasInjury = !!(data.safety && data.safety.injury && data.safety.injury.hasInjury);
       document.getElementById('hasInjury').checked = hasInjury;
@@ -5082,11 +5244,11 @@
       document.getElementById('materialInput').value = "25mm 鍍鋅鋼管 80支、4C 25mm² XLPE 電纜 150米 (DO# E-90231)";
 
       document.getElementById('hasMOSI').checked = true;
+      setInspectionRows('mosi', [{ item: 'EV 充電樁控制箱 (6套) 到場開箱檢驗', result: '合格 (Passed / Approved)' }]);
       toggleMosiSection(true);
-      document.getElementById('mosiItem').value = "EV 充電樁控制箱 (6套) 到場開箱檢驗";
-      document.getElementById('mosiResult').value = "合格 (Passed / Approved)";
 
       document.getElementById('hasOtherInspection').checked = false;
+      setInspectionRows('other', []);
       toggleOtherInspection(false);
 
       document.getElementById('hasInjury').checked = false;
@@ -5113,6 +5275,8 @@
       document.getElementById('locationListContainer').innerHTML = '';
       
       toggleMaterialSection(false);
+      setInspectionRows('mosi', []);
+      setInspectionRows('other', []);
       toggleMosiSection(false);
       toggleOtherInspection(false);
       toggleInjuryBox(false);
@@ -5238,17 +5402,7 @@
           hasArrival: document.getElementById('hasMaterialArrival').checked,
           details: document.getElementById('materialInput').value.trim()
         },
-        inspections: {
-          mosi: {
-            hasMosi: document.getElementById('hasMOSI').checked,
-            item: document.getElementById('mosiItem').value.trim(),
-            result: document.getElementById('mosiResult').value
-          },
-          other: {
-            hasOther: document.getElementById('hasOtherInspection').checked,
-            details: document.getElementById('otherInspectionDetail').value.trim()
-          }
-        },
+        inspections: collectInspections(),
         safety: {
           injury: {
             hasInjury: document.getElementById('hasInjury').checked,

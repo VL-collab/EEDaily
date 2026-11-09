@@ -388,6 +388,8 @@ function parseDailyJson(file, text) {
   const material = data.materialDelivery || {};
   const mosi = (data.inspections && data.inspections.mosi) || {};
   const other = (data.inspections && data.inspections.other) || {};
+  const mosiSummary = adminInspectionSummary(mosi, 'mosi');
+  const otherSummary = adminInspectionSummary(other, 'other');
   const injury = (data.safety && data.safety.injury) || {};
   const obstacle = (data.safety && data.safety.obstacles) || {};
   const weatherItems = Array.isArray(data.weatherArray) && data.weatherArray.length
@@ -414,10 +416,10 @@ function parseDailyJson(file, text) {
     materialArrival: adminYesNo(material.hasArrival),
     materialDetails: material.details || '',
     hasMosi: adminYesNo(mosi.hasMosi),
-    mosiItem: mosi.item || '',
-    mosiResult: mosi.hasMosi ? (mosi.result || '') : '',
+    mosiItem: mosi.hasMosi ? mosiSummary.item : (mosi.item || ''),
+    mosiResult: mosi.hasMosi ? mosiSummary.result : '',
     hasOtherInspection: adminYesNo(other.hasOther),
-    otherInspectionDetails: other.details || '',
+    otherInspectionDetails: other.hasOther ? otherSummary : (other.details || ''),
     hasInjury: adminYesNo(injury.hasInjury),
     injuryDetails: injury.details || '',
     hasObstacle: adminYesNo(obstacle.hasObstacle),
@@ -672,6 +674,40 @@ function wordXmlToHtmlDocument(xmlText) {
   return html;
 }
 
+function adminInspectionSummary(record, kind) {
+  const rows = Array.isArray(record && record.items)
+    ? record.items.filter(row => row && String(row.item || '').trim()).map(row => ({
+        item: String(row.item).trim(),
+        result: String(row.result || '').trim()
+      }))
+    : [];
+  if (kind === 'other') {
+    if (rows.length) return rows.map(row => (row.result ? `${row.item} [${row.result}]` : row.item)).join('；');
+    return (record && record.details) || '';
+  }
+  if (rows.length === 1) return { item: rows[0].item, result: rows[0].result };
+  if (rows.length > 1) {
+    return {
+      item: rows.map(row => (row.result ? `${row.item} [${row.result}]` : row.item)).join('；'),
+      result: ''
+    };
+  }
+  return {
+    item: (record && record.item) || '',
+    result: (record && record.result) || ''
+  };
+}
+
+function adminReadMosiClause(text) {
+  const raw = String(text || '').trim();
+  if (!raw || raw === '無') return { has: false, item: '', result: '' };
+  const parts = raw.split('；').map(part => part.trim()).filter(Boolean);
+  if (parts.length > 1) return { has: true, item: raw, result: '' };
+  const item = (raw.match(/^(.*?)\s*\[/) || [, raw])[1].trim();
+  const resultMatch = raw.match(/\[(.+)\]/);
+  return { has: true, item, result: resultMatch ? resultMatch[1] : '' };
+}
+
 async function parseDailyWord(file, buffer) {
   const entries = readZipEntries(buffer);
   const chunk = entries.find(entry => entry.name === 'word/afchunk.mht');
@@ -723,6 +759,7 @@ function parseDailyWordDocument(file, doc) {
   const inspectionText = materialRows[1] ? materialRows[1][1] : '';
   const mosiMatch = String(inspectionText || '').match(/MOSI 驗收[:：]\s*([^\n]*)/);
   const otherMatch = String(inspectionText || '').match(/工序檢查[:：]\s*([^\n]*)/);
+  const mosiClause = adminReadMosiClause(mosiMatch && mosiMatch[1]);
   const bodyText = wordBlockText(doc.body);
   const injuryMatch = bodyText.match(/工傷事故[:：]\s*([\s\S]*?)(?=\n+\s*進度受阻[:：]|$)/);
   const obstacleMatch = bodyText.match(/進度受阻[:：]\s*([\s\S]*?)(?=\n+\s*(?:[0-9]+\.\s*)?辦公室人員|$)/);
@@ -771,9 +808,9 @@ function parseDailyWordDocument(file, doc) {
     overtimePersonHours: adminRound1(periods.reduce((sum, item) => sum + adminNum(item.personHours), 0)),
     materialArrival: adminYesNo(materialText && !materialText.includes('無物料')),
     materialDetails: materialText && !materialText.includes('無物料') ? materialText : '',
-    hasMosi: adminYesNo(mosiMatch && mosiMatch[1].trim() && mosiMatch[1].trim() !== '無'),
-    mosiItem: mosiMatch && mosiMatch[1].trim() !== '無' ? (mosiMatch[1].match(/^(.*?)\s*\[/) || [, mosiMatch[1]])[1].trim() : '',
-    mosiResult: mosiMatch && /\[(.+)\]/.test(mosiMatch[1]) ? mosiMatch[1].match(/\[(.+)\]/)[1] : '',
+    hasMosi: adminYesNo(mosiClause.has),
+    mosiItem: mosiClause.item,
+    mosiResult: mosiClause.result,
     hasOtherInspection: adminYesNo(otherMatch && otherMatch[1].trim() && otherMatch[1].trim() !== '無'),
     otherInspectionDetails: otherMatch && otherMatch[1].trim() !== '無' ? otherMatch[1].trim() : '',
     hasInjury: adminYesNo(injuryText && !injuryText.includes('零工傷') && injuryText !== '無'),

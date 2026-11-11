@@ -8,7 +8,8 @@ const adminState = {
   calendarMonth: '',
   periodType: 'weekly',
   lang: 'zh',
-  busy: false
+  busy: false,
+  clearing: false
 };
 
 const reportText = {
@@ -210,13 +211,23 @@ function addIsoDays(iso, days) {
   return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
 }
 
-function mondayOf(iso) {
+function addIsoMonths(iso, months) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  if (!match) return iso;
-  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
-  const weekday = date.getUTCDay();
-  const offset = weekday === 0 ? -6 : 1 - weekday;
-  return addIsoDays(iso, offset);
+  if (!match) return '';
+  const year = Number(match[1]);
+  const day = Number(match[3]);
+  const target = new Date(Date.UTC(year, Number(match[2]) - 1 + months, 1));
+  const last = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  return `${target.getUTCFullYear()}-${pad2(target.getUTCMonth() + 1)}-${pad2(Math.min(day, last))}`;
+}
+
+function monthlyEndFrom(start) {
+  const nextSame = addIsoMonths(start, 1);
+  const startDay = Number(String(start).slice(8, 10));
+  const nextDay = Number(String(nextSame).slice(8, 10));
+  if (!nextSame) return start;
+  if (nextDay < startDay) return nextSame;
+  return addIsoDays(nextSame, -1);
 }
 
 function eachIsoDate(start, end) {
@@ -1244,18 +1255,13 @@ function selectedAnchor() {
 
 function currentPeriod() {
   const anchor = selectedAnchor();
+  const start = anchor;
   if (adminState.periodType === 'biweekly') {
-    const weekStart = mondayOf(anchor);
-    return { type: 'biweekly', anchor, start: addIsoDays(weekStart, -7), end: addIsoDays(weekStart, 6) };
+    return { type: 'biweekly', anchor, start, end: addIsoDays(start, 13) };
   }
   if (adminState.periodType === 'monthly') {
-    const match = /^(\d{4})-(\d{2})/.exec(anchor);
-    const year = match ? Number(match[1]) : 2026;
-    const month = match ? Number(match[2]) : 1;
-    const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
-    return { type: 'monthly', anchor, start: `${year}-${pad2(month)}-01`, end: `${year}-${pad2(month)}-${pad2(last)}` };
+    return { type: 'monthly', anchor, start, end: monthlyEndFrom(start) };
   }
-  const start = mondayOf(anchor);
   return { type: 'weekly', anchor, start, end: addIsoDays(start, 6) };
 }
 
@@ -2139,6 +2145,8 @@ function refreshAdminView() {
   document.querySelectorAll('input[name="adminLang"]').forEach(input => {
     input.checked = input.value === adminState.lang;
   });
+  const clearButton = document.getElementById('adminClearFiles');
+  if (clearButton) clearButton.disabled = !adminState.files.length;
   const sorted = adminState.files.slice().sort(sortAdminFiles);
   list.innerHTML = sorted.length ? sorted.map(file => `
     <li class="border border-slate-200 rounded-xl p-3 flex items-start justify-between gap-3">
@@ -2180,7 +2188,8 @@ function renderAdminCalendar(period) {
     if (iso === adminState.anchor) classes.push('is-anchor');
     const ot = files.some(file => file.hasOt) ? '<span class="admin-ot">OT</span>' : '';
     const count = files.length > 1 ? `<span class="block text-[10px] font-bold opacity-70">${files.length} 份</span>` : '';
-    cells += `<button type="button" data-action="pick-day" data-date="${iso}" class="${classes.join(' ')}"><span class="block text-sm font-black">${day}</span>${ot}${count}</button>`;
+    const startMark = iso === period.start ? '<span class="block text-[10px] font-black leading-none mt-0.5">開始</span>' : '';
+    cells += `<button type="button" data-action="pick-day" data-date="${iso}" class="${classes.join(' ')}"><span class="block text-sm font-black">${day}</span>${startMark}${ot}${count}</button>`;
   }
   host.innerHTML = `<div class="admin-cal mb-2">${headers}</div><div class="admin-cal">${cells}</div>`;
 }
@@ -2242,6 +2251,78 @@ async function exportAdminReport(kind) {
   }
 }
 
+function confirmWithCountdown(title, message, yesLabel, seconds = 5) {
+  return new Promise(resolve => {
+    const existing = document.getElementById('confirmModal');
+    if (existing) existing.remove();
+    const modal = document.createElement('div');
+    modal.id = 'confirmModal';
+    modal.className = 'fixed inset-0 bg-slate-950/60 z-[80] flex items-center justify-center p-4';
+    modal.innerHTML = `
+      <div class="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-200">
+        <h3 class="text-lg font-bold text-slate-900 mb-1"></h3>
+        <p class="text-sm text-slate-600 mb-5 leading-relaxed whitespace-pre-line"></p>
+        <div class="flex gap-2">
+          <button type="button" data-answer="no" class="flex-1 h-11 bg-slate-200 hover:bg-slate-300 active:scale-95 font-bold text-slate-700 rounded-xl transition">取消</button>
+          <button type="button" data-answer="yes" disabled class="flex-1 h-11 bg-rose-600 text-white font-bold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:bg-rose-700 enabled:active:scale-95"></button>
+        </div>
+      </div>
+    `;
+    modal.querySelector('h3').textContent = title;
+    modal.querySelector('p').textContent = message;
+    const yes = modal.querySelector('[data-answer="yes"]');
+    let left = seconds;
+    const paint = () => {
+      yes.textContent = left > 0 ? `${yesLabel}（${left}）` : yesLabel;
+    };
+    paint();
+    const timer = setInterval(() => {
+      left -= 1;
+      if (left <= 0) {
+        clearInterval(timer);
+        yes.disabled = false;
+        yes.textContent = yesLabel;
+        return;
+      }
+      paint();
+    }, 1000);
+    const finish = (ok) => {
+      clearInterval(timer);
+      modal.remove();
+      resolve(ok);
+    };
+    modal.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-answer]');
+      if (!button || button.disabled) return;
+      finish(button.getAttribute('data-answer') === 'yes');
+    });
+    modal.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') finish(false);
+    });
+    document.body.appendChild(modal);
+    yes.focus();
+  });
+}
+
+async function clearAdminFiles() {
+  if (!adminState.files.length || adminState.clearing) return;
+  adminState.clearing = true;
+  try {
+    const count = adminState.files.length;
+    const first = await confirmWithCountdown('第一次確認', `清單內有 ${count} 份日報。清除後，這些檔案和內容會從這部裝置移除，需要再重新匯入。請等候 5 秒，再按「下一步」。`, '下一步');
+    if (!first) return;
+    const second = await confirmWithCountdown('第二次確認', '請再確認一次。按「一鍵清除」後會立即清除全部日報，而且不能還原。', '一鍵清除');
+    if (!second) return;
+    adminState.files = [];
+    adminState.importNotes = [];
+    adminState.status = '';
+    persistAdminFiles();
+    refreshAdminView();
+  } finally {
+    adminState.clearing = false;
+  }
+}
+
 function onAdminClick(event) {
   const actionEl = event.target.closest('[data-action]');
   if (!actionEl) return;
@@ -2253,6 +2334,8 @@ function onAdminClick(event) {
     adminState.files = adminState.files.filter(file => file.id !== id);
     persistAdminFiles();
     refreshAdminView();
+  } else if (action === 'clear') {
+    clearAdminFiles();
   } else if (action === 'prev-month' || action === 'next-month') {
     const [year, month] = (adminState.calendarMonth || selectedAnchor().slice(0, 7) || '2026-01').split('-').map(Number);
     const date = new Date(Date.UTC(year, month - 1 + (action === 'next-month' ? 1 : -1), 1));

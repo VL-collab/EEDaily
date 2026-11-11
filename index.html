@@ -50,7 +50,10 @@
           <i data-lucide="zap" class="w-6 h-6 stroke-[2.5]"></i>
         </div>
         <div class="min-w-0">
-          <h1 class="text-base sm:text-lg md:text-xl font-bold leading-tight">地盤電力工程每日記錄系統</h1>
+          <h1 class="text-base sm:text-lg md:text-xl font-bold leading-tight flex flex-wrap items-baseline gap-x-2">
+            <span>地盤電力工程每日記錄系統</span>
+            <span id="appVersion" class="text-sm sm:text-base font-semibold text-amber-300 whitespace-nowrap">(Ver. 1.01)</span>
+          </h1>
           <p class="text-[11px] sm:text-xs text-amber-400 font-medium tracking-wide hidden sm:block">Daily Electrical Site Works Log</p>
         </div>
       </div>
@@ -537,7 +540,7 @@
         <li>只匯入每日 Word、Excel 或專檔。不要匯入已經彙整的週報、雙週報或月報。</li>
         <li>同一項目、同一日最好只有一份「日間＋OT」日報。若同日還有另一份純日間日報，系統會略過日間檔，避免人數計兩次。</li>
         <li>一天不建議多於一份額外的 OT 日報。不同時段的 OT 日報會當成多段超時，人數和人時相加。完全相同的 OT 時段只保留較新的一份。</li>
-        <li>在月曆點選日子。週報取該週星期一至日；雙週報取上一週星期一至本週星期日；月報取該月。中文和英文報告使用同一套數字。</li>
+        <li>在月曆點選開始日期。週報由該日起計 7 日；雙週報由該日起計 14 日；月報由該日起計至下一個月同一日的前一日（下個月沒有該日時，至該月最後一日）。不會固定由 1 號或星期一開始。中文和英文報告使用同一套數字。</li>
         <li>日間人數只計沒有勾 OT 的地點。OT 人數只計已勾 OT 的地點。OT 人時是各時段時數乘該時段人數。工種人數不可相加當作當日總人數。</li>
         <li>匯出前先看檔案清單。「日間＋OT」代表該份同時有日間和超時。出現略過提示時，表示重複檔沒有計入。</li>
       </ol>
@@ -571,7 +574,10 @@
       <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
         <div class="flex items-center justify-between gap-2 mb-3">
           <h3 class="font-black text-slate-900">檔案清單</h3>
-          <button type="button" data-action="add" class="h-9 px-3 rounded-lg bg-slate-900 text-white text-xs font-bold">新增日報</button>
+          <div class="flex items-center gap-2">
+            <button type="button" id="adminClearFiles" data-action="clear" class="h-9 px-3 rounded-lg bg-rose-50 text-rose-700 text-xs font-bold disabled:opacity-40" disabled>一鍵清除</button>
+            <button type="button" data-action="add" class="h-9 px-3 rounded-lg bg-slate-900 text-white text-xs font-bold">新增日報</button>
+          </div>
         </div>
         <ul id="adminFileList" class="space-y-2 max-h-[32rem] overflow-auto"></ul>
       </div>
@@ -582,16 +588,16 @@
           <button type="button" data-action="next-month" class="w-10 h-10 rounded-xl border border-slate-200 font-black text-slate-700">›</button>
         </div>
         <div id="adminCalendar"></div>
-        <p class="mt-3 text-xs text-slate-500">黃底是已匯入日報的日子。日子上的 OT 表示該日有超時工作。同一日最好只用一份日報同時記錄日間和 OT；只有另一段不同超時，才再加一份 OT 日報。點選日子後，週報會取該週星期一至日；雙週報取上一週星期一至本週星期日；月報取該月。</p>
+        <p class="mt-3 text-xs text-slate-500">黃底是已匯入日報的日子。深色是開始日，框線是報告涵蓋的日子。日子上的 OT 表示該日有超時工作。同一日最好只用一份日報同時記錄日間和 OT；只有另一段不同超時，才再加一份 OT 日報。點選的日子就是開始日期：週報由該日起計 7 日，雙週報 14 日，月報至下一個月同一日的前一日。</p>
       </div>
     </div>
 
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 md:p-6 space-y-4">
       <div class="flex flex-col lg:flex-row lg:items-center gap-4">
         <div class="flex flex-wrap gap-2" id="adminPeriodChoices">
-          <label class="h-10 px-3 rounded-xl border border-slate-200 flex items-center gap-2 text-sm font-bold"><input type="radio" name="adminPeriod" value="weekly" checked>週報（一至日）</label>
-          <label class="h-10 px-3 rounded-xl border border-slate-200 flex items-center gap-2 text-sm font-bold"><input type="radio" name="adminPeriod" value="biweekly">雙週報（上週及本週）</label>
-          <label class="h-10 px-3 rounded-xl border border-slate-200 flex items-center gap-2 text-sm font-bold"><input type="radio" name="adminPeriod" value="monthly">月報</label>
+          <label class="h-10 px-3 rounded-xl border border-slate-200 flex items-center gap-2 text-sm font-bold"><input type="radio" name="adminPeriod" value="weekly" checked>週報（開始日起 7 日）</label>
+          <label class="h-10 px-3 rounded-xl border border-slate-200 flex items-center gap-2 text-sm font-bold"><input type="radio" name="adminPeriod" value="biweekly">雙週報（開始日起 14 日）</label>
+          <label class="h-10 px-3 rounded-xl border border-slate-200 flex items-center gap-2 text-sm font-bold"><input type="radio" name="adminPeriod" value="monthly">月報（開始日起一個月）</label>
         </div>
         <div class="flex flex-wrap gap-2" id="adminLangChoices">
           <label class="h-10 px-3 rounded-xl border border-slate-200 flex items-center gap-2 text-sm font-bold"><input type="radio" name="adminLang" value="zh" checked>中文報告</label>

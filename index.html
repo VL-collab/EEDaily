@@ -76,7 +76,7 @@
       <summary class="cursor-pointer text-sm md:text-base font-black text-slate-900">日報使用守則</summary>
       <ol class="mt-3 space-y-2 text-sm text-slate-700 leading-relaxed list-decimal pl-5">
         <li>同一日的正常工作與超時工作，盡量寫在同一份日報。勾選「超時工作 (OT)」後，只在真正超時的地點勾 (OT)。總開關會把各地點一併勾上，日間地點請取消勾選。</li>
-        <li>總開工人數是全部地點相加。超時人數只計已勾 (OT) 的地點。各超時時段的人數加總，必須等於超時人數，才可以匯出。</li>
+        <li>總開工人數只計沒有勾選 (OT) 的地點。已勾 (OT) 的地點人數不計入總開工人數，只記入超時工作時段。各超時時段的人數加總，必須等於已勾 (OT) 的地點人數，才可以匯出。</li>
         <li>一天不建議另外再開超過一份 OT 日報。同一段超時只留一份。只有另一段、時間不同的超時，才另存一份只記該段的 OT 日報。</li>
         <li>要更正當日資料，請改同一份再匯出，不要同一日存多份內容相近的日報。</li>
         <li>天氣警告、停工、物料、檢查、工傷、阻礙和辦公室人員，都寫在這份日報。未簽名不能產生日報。</li>
@@ -223,7 +223,7 @@
                 <span id="headcountTitleText">今日地盤總開工人數 (HEADCOUNT)</span>
                 <span class="text-xs text-amber-700 font-normal bg-amber-200/70 px-1.5 py-0.5 rounded">系統自動累計・不可修改</span>
               </label>
-              <p class="text-xs text-amber-800 mt-0.5">數值將由下方各分佈地點之工人人數自動即時加總。超時人數只計已勾 (OT) 的地點。</p>
+              <p class="text-xs text-amber-800 mt-0.5">只加總沒有勾選 (OT) 的地點。已勾 (OT) 的地點人數不計入今日地盤總開工人數，只記入下方超時工作時段。</p>
             </div>
             <div class="flex items-center gap-2 w-full sm:w-auto">
               <input type="number" id="totalHeadcount" min="0" value="0" readonly tabindex="-1"
@@ -293,7 +293,7 @@
           <div id="locationListContainer" class="space-y-3"></div>
 
           <div class="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs md:text-sm font-medium text-slate-600">
-            <span>各分佈地點人數累計：</span>
+            <span>計入今日總開工人數（不含已勾 OT）：</span>
             <div class="space-x-1">
               <span id="calculatedSubtotal" class="text-base font-bold text-slate-900">0</span>
               <span>人</span>
@@ -1746,6 +1746,24 @@
       return total;
     }
 
+    function siteHeadcountFromRows() {
+      let total = 0;
+      document.querySelectorAll('.location-row').forEach(row => {
+        const box = row.querySelector('.row-ot');
+        if (box && box.checked) return;
+        const input = row.querySelector('.row-workers');
+        total += parseInt(input && input.value, 10) || 0;
+      });
+      return total;
+    }
+
+    function siteHeadcountFromLocations(list) {
+      return (Array.isArray(list) ? list : []).reduce((sum, item) => {
+        if (!item || item.ot) return sum;
+        return sum + (parseInt(item.workers, 10) || 0);
+      }, 0);
+    }
+
     function refreshLocationOtStyle(row) {
       if (!row) return;
       const on = !!(row.querySelector('.row-ot') && row.querySelector('.row-ot').checked);
@@ -2073,20 +2091,16 @@
     }
 
     function updateHeadcountCalculation() {
-      const workerInputs = document.querySelectorAll('.row-workers');
-      let subtotal = 0;
-      workerInputs.forEach(input => {
-        subtotal += (parseInt(input.value, 10) || 0);
-      });
+      const siteTotal = siteHeadcountFromRows();
 
       const totalInput = document.getElementById('totalHeadcount');
       if (totalInput) {
-        totalInput.value = subtotal;
+        totalInput.value = siteTotal;
       }
 
       const subtotalEl = document.getElementById('calculatedSubtotal');
       if (subtotalEl) {
-        subtotalEl.textContent = subtotal;
+        subtotalEl.textContent = siteTotal;
       }
 
       const otTotal = otHeadcountFromRows();
@@ -2099,9 +2113,9 @@
 
       const badge = document.getElementById('headcountStatusBadge');
       if (badge) {
-        const otNote = formIsNight() ? `，其中超時 ${otTotal} 人` : '';
+        const otNote = otTotal ? `；已勾 OT ${otTotal} 人只計入超時時段` : '';
         badge.className = "px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1.5 border border-emerald-300";
-        badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-600"></span><span>系統自動加總：共 ${subtotal} 人${otNote}</span>`;
+        badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-600"></span><span>系統自動加總：共 ${siteTotal} 人${otNote}</span>`;
       }
       updateNightPeriodStatus();
     }
@@ -3196,7 +3210,7 @@
         }
       });
 
-      const computedTotal = locationList.reduce((acc, cur) => acc + cur.workers, 0);
+      const computedTotal = siteHeadcountFromLocations(locationList);
       const overtimeHeadcount = locationList.reduce((acc, cur) => acc + (cur.ot ? cur.workers : 0), 0);
       const selectedWeathers = getSelectedWeather();
       const progressList = getCollectedProgressList();
@@ -4736,8 +4750,8 @@
         ['日後合併', '在管理者模式一次匯入多份每日 Excel 或「匯出專檔」的 JSON，即可產生週報、雙週報及月報。請使用每日檔，不要把已經彙整的總報告再匯入。'],
         ['請勿修改', '請勿更改工作表名稱，亦勿修改資料表第 1 列的欄位代碼。第 1 列已隱藏，供匯入程式讀取；第 2 列是中文欄名。「每日全文」是閱讀頁，沒有隱藏欄位代碼。'],
         ['每日全文', '開啟檔案後的第一頁。一次看完當日全部內容，包括基本資料、開工分佈、施工進度、物料檢驗、安全、辦公室人員、超時時段及天氣警告。'],
-        ['彙總', '一日一列。統計每日總人數、超時人數、天氣、停工、工傷及阻礙時使用此表。總人數是全部地點；超時人數只計已勾 (OT) 的地點。'],
-        ['開工分佈', '一個施工地點一列。總人數請加總此表的「人數」。超時人數只加「超時」欄為「是」的列。'],
+        ['彙總', '一日一列。統計每日總人數、超時人數、天氣、停工、工傷及阻礙時使用此表。總人數只計沒有勾 (OT) 的地點；已勾 (OT) 的人數不計入總人數，只計入超時人數。'],
+        ['開工分佈', '一個施工地點一列。今日總開工人數只加「超時」欄不是「是」的列。超時人數只加「超時」欄為「是」的列。'],
         ['工種明細', '一個工種細類一列。「地點人數」是該地點總人數；同一地點有多個細類時人數會重複，不可直接相加。「超時」跟該地點的 (OT) 相同。'],
         ['施工進度', '一個工序一列。完成百分比為 0 至 100。'],
         ['超時時段', '一個超時時段一列。「人時數」等於時數乘人數，可以加總。沒有超時工作時此表只有欄名。'],
@@ -5380,7 +5394,7 @@
         title: row.querySelector('.prog-title').value,
         percent: normalizeProgressPercent(row.querySelector('.prog-percent').value)
       }));
-      const totalHeadcount = locations.reduce((sum, item) => sum + (item.workers || 0), 0);
+      const totalHeadcount = siteHeadcountFromLocations(locations);
       const overtimeHeadcount = locations.reduce((sum, item) => sum + (item.ot ? (item.workers || 0) : 0), 0);
       return {
         version: 1,

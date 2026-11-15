@@ -1219,7 +1219,7 @@ function analyzeContract(files, period) {
   const days = dates.map(date => buildDayRecord(date, byDate.get(date) || []));
   const reported = days.filter(day => day.files.length);
   const daytimeDays = reported.filter(day => adminNum(day.daytimeHeadcount) > 0);
-  const totalDaytime = reported.reduce((sum, day) => sum + adminNum(day.daytimeHeadcount), 0);
+  const totalDaytime = days.reduce((sum, day) => sum + adminNum(day.daytimeHeadcount), 0);
   const peak = daytimeDays.reduce((best, day) => day.daytimeHeadcount > best.value ? { value: day.daytimeHeadcount, date: day.date } : best, { value: 0, date: '' });
   const categories = new Map();
   accumulateCategories(files, categories);
@@ -1231,7 +1231,7 @@ function analyzeContract(files, period) {
     days,
     files,
     totalDaytime,
-    averageDaytime: daytimeDays.length ? adminRound1(totalDaytime / daytimeDays.length) : 0,
+    averageDaytime: days.length ? adminRound1(totalDaytime / days.length) : 0,
     peak,
     otPeople: days.reduce((sum, day) => sum + day.otHeadcount, 0),
     otHours: adminRound1(days.reduce((sum, day) => sum + day.otPersonHours, 0)),
@@ -1285,8 +1285,8 @@ function narrativeFor(contract, period, lang) {
       ? `${t(period.type)} ${period.start} ${t('to')} ${period.end}. Reports were filed on ${contract.reportedDays} day(s). Days without a report: ${missing}.`
       : `${t(period.type)}涵蓋 ${period.start} 至 ${period.end}。其中 ${contract.reportedDays} 日有日報。未有日報的日子：${missing}。`,
     lang === 'en'
-      ? `Daytime man-days total ${contract.totalDaytime}. Average daytime headcount is ${contract.averageDaytime}. Peak daytime headcount is ${peak}.`
-      : `日間開工人日合計 ${contract.totalDaytime}。平均每日 ${contract.averageDaytime} 人。高峰開工人數為 ${peak}。`,
+      ? `Daytime man-days total ${contract.totalDaytime}. Average daytime headcount over all ${contract.days.length} calendar day(s) is ${contract.averageDaytime}. Days without a report count as zero. Peak daytime headcount is ${peak}.`
+      : `日間開工人日合計 ${contract.totalDaytime}。平均日間開工人數按涵蓋的 ${contract.days.length} 個月曆日計算為 ${contract.averageDaytime} 人，沒有日報的日子以 0 人計入。高峰開工人數為 ${peak}。`,
     lang === 'en'
       ? `Overtime was recorded on ${contract.otDays} day(s), with OT headcount ${contract.otPeople} and ${contract.otHours} OT person-hours.`
       : `超時工作共 ${contract.otDays} 日，OT 人數合計 ${contract.otPeople}，OT 人時數 ${contract.otHours}。`
